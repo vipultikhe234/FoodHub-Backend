@@ -5,9 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Coupon;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use App\Services\FCMService;
 
 class CouponController extends Controller
 {
+    protected $fcmService;
+
+    public function __construct(FCMService $fcmService)
+    {
+        $this->fcmService = $fcmService;
+    }
+
     public function validateCoupon(Request $request)
     {
         $request->validate([
@@ -63,6 +71,10 @@ class CouponController extends Controller
         ]);
 
         $coupon = Coupon::create($validated);
+
+        // Broadcast refresh
+        $this->fcmService->broadcastData(['type' => 'refresh_coupons', 'action' => 'created', 'code' => $coupon->code]);
+
         return response()->json(['message' => 'Coupon created successfully', 'data' => $coupon], 201);
     }
 
@@ -79,12 +91,20 @@ class CouponController extends Controller
         ]);
 
         $coupon->update($validated);
+
+        // Broadcast refresh
+        $this->fcmService->broadcastData(['type' => 'refresh_coupons', 'action' => 'updated', 'id' => (string)$id]);
+
         return response()->json(['message' => 'Coupon updated successfully', 'data' => $coupon]);
     }
 
     public function destroy($id)
     {
         Coupon::destroy($id);
+
+        // Broadcast refresh
+        $this->fcmService->broadcastData(['type' => 'refresh_coupons', 'action' => 'deleted', 'id' => (string)$id]);
+
         return response()->json(['message' => 'Coupon deleted successfully']);
     }
 }

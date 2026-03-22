@@ -90,4 +90,9 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Coupon Routes
     Route::post('/coupons/validate', [\App\Http\Controllers\CouponController::class, 'validateCoupon']);
+
+    // FCM Notification Routes
+    Route::post('/save-fcm-token', [\App\Http\Controllers\FCMController::class, 'saveToken']);
+    Route::post('/remove-fcm-token', [\App\Http\Controllers\FCMController::class, 'removeToken']);
+    Route::post('/send-notification', [\App\Http\Controllers\FCMController::class, 'sendManualNotification']);
 });

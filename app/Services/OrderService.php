@@ -11,7 +11,8 @@ class OrderService
 {
     public function __construct(
         protected OrderRepository $repository,
-        protected StripePaymentService $stripeService
+        protected StripePaymentService $stripeService,
+        protected \App\Services\FCMService $fcmService
     ) {}
 
     public function placeOrder(array $data, array $items)
@@ -74,12 +75,24 @@ class OrderService
             ];
 
             $order = $this->repository->create($orderData, $items);
+            $order->load(['user']);
 
             $order->payment()->create([
                 'payment_method' => $data['payment_method'],
                 'amount'         => $totalPrice,
                 'status'         => 'pending',
             ]);
+
+            // Notify user of order success
+            if ($order->user && $order->user->fcm_token) {
+                $this->fcmService->sendNotification(
+                    $order->user->fcm_token,
+                    'Order Confirmed! 🎉',
+                    'Your order ID #' . str_pad($order->id, 4, '0', STR_PAD_LEFT) . ' has been placed successfully.',
+                    ['type' => 'order', 'id' => (string)$order->id],
+                    $order->user_id
+                );
+            }
 
             // 4. Stripe PaymentIntent (only if method is stripe)
             if ($data['payment_method'] === 'stripe') {
@@ -116,6 +129,26 @@ class OrderService
 
         $order = $this->repository->updateStatus($id, $status);
         if ($order) {
+            $order->load(['user']); // Ensure user info is loaded for notification
+            // Notify user of status change
+            if ($order->user && $order->user->fcm_token) {
+                $statusMsg = match($status) {
+                    'preparing'  => 'Your order is being prepared by the kitchen! 🧑‍🍳',
+                    'dispatched' => 'Your order is on the way! 🛵💨',
+                    'delivered'  => 'Your order has been delivered! Enjoy your meal! 🍽️',
+                    'cancelled'  => 'Your order has been cancelled.',
+                    default      => 'Your order status has been updated to: ' . ucfirst($status)
+                };
+
+                $this->fcmService->sendNotification(
+                    $order->user->fcm_token,
+                    'Order Update',
+                    $statusMsg,
+                    ['type' => 'order', 'id' => (string)$order->id, 'status' => $status],
+                    $order->user_id
+                );
+            }
+
             // event(new OrderStatusChanged($order, $status)); // Re-enable with websockets
             return $order;
         }

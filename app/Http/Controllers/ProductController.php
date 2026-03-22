@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Cache;
 class ProductController extends Controller
 {
     public function __construct(
-        protected ProductService $service
+        protected ProductService $service,
+        protected \App\Services\FCMService $fcmService
     ) {}
 
     public function index()
@@ -44,6 +45,10 @@ class ProductController extends Controller
         $product = $this->service->createProduct($request->validated());
         Cache::forget('products_all');     // Bust cache on write
         Cache::forget('categories_active');
+
+        // Broadcast refresh to mobile side
+        $this->fcmService->broadcastData(['type' => 'refresh_products', 'action' => 'created', 'id' => (string)$product->id]);
+
         return new ProductResource($product);
     }
 
@@ -55,6 +60,10 @@ class ProductController extends Controller
         }
         Cache::forget('products_all');     // Bust cache on write
         Cache::forget("product_{$id}");
+
+        // Broadcast refresh to mobile side
+        $this->fcmService->broadcastData(['type' => 'refresh_products', 'action' => 'updated', 'id' => (string)$id]);
+
         return response()->json(['message' => 'Product updated successfully']);
     }
 
@@ -66,6 +75,10 @@ class ProductController extends Controller
         }
         Cache::forget('products_all');     // Bust cache on write
         Cache::forget("product_{$id}");
+
+        // Broadcast refresh to mobile side
+        $this->fcmService->broadcastData(['type' => 'refresh_products', 'action' => 'deleted', 'id' => (string)$id]);
+
         return response()->json(['message' => 'Product deleted successfully']);
     }
 

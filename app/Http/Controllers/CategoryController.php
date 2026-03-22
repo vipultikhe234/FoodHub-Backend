@@ -11,7 +11,8 @@ use App\Services\CategoryService;
 class CategoryController extends Controller
 {
     public function __construct(
-        protected CategoryService $service
+        protected CategoryService $service,
+        protected \App\Services\FCMService $fcmService
     ) {}
 
     public function index()
@@ -27,6 +28,10 @@ class CategoryController extends Controller
         $category = $this->service->createCategory($request->validated());
         \Illuminate\Support\Facades\Cache::forget('categories_all');
         \Illuminate\Support\Facades\Cache::forget('categories_active');
+
+        // Broadcast refresh
+        $this->fcmService->broadcastData(['type' => 'refresh_categories', 'action' => 'created', 'id' => (string)$category->id]);
+
         return new CategoryResource($category);
     }
 
@@ -38,6 +43,10 @@ class CategoryController extends Controller
         }
         \Illuminate\Support\Facades\Cache::forget('categories_all');
         \Illuminate\Support\Facades\Cache::forget('categories_active');
+
+        // Broadcast refresh
+        $this->fcmService->broadcastData(['type' => 'refresh_categories', 'action' => 'updated', 'id' => (string)$id]);
+
         return response()->json(['message' => 'Category updated successfully']);
     }
 
@@ -49,6 +58,10 @@ class CategoryController extends Controller
         }
         \Illuminate\Support\Facades\Cache::forget('categories_all');
         \Illuminate\Support\Facades\Cache::forget('categories_active');
+
+        // Broadcast refresh
+        $this->fcmService->broadcastData(['type' => 'refresh_categories', 'action' => 'deleted', 'id' => (string)$id]);
+
         return response()->json(['message' => 'Category deleted']);
     }
 }
