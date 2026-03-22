@@ -39,6 +39,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [\App\Http\Controllers\AuthController::class, 'profile']);
     Route::put('/profile', [\App\Http\Controllers\AuthController::class, 'updateProfile']);
     Route::post('/logout', [\App\Http\Controllers\AuthController::class, 'logout']);
+    
+    Route::get('/addresses', [\App\Http\Controllers\API\UserAddressController::class, 'index']);
+    Route::post('/addresses', [\App\Http\Controllers\API\UserAddressController::class, 'store']);
 
     // --- Admin Only Routes ---
     Route::middleware('admin')->group(function () {
