@@ -60,7 +60,7 @@ class OnboardingController extends Controller
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
             'role' => User::ROLE_RIDER,
-            'merchant_id' => $request->user()->id, // Linked to the merchant
+            'merchant_id' => $request->user()->merchant?->id, // Linked to the merchant
         ]);
 
         return response()->json([

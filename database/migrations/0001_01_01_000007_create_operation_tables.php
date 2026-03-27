@@ -67,6 +67,36 @@ return new class extends Migration
                 $row->timestamps();
                 $row->softDeletes();
             });
+        } else {
+            Schema::table('orders', function (Blueprint $row) {
+                if (!Schema::hasColumn('orders', 'address_snapshot')) {
+                    $row->text('address_snapshot')->nullable();
+                }
+                if (!Schema::hasColumn('orders', 'order_type')) {
+                    $row->string('order_type')->default('delivery');
+                }
+                if (!Schema::hasColumn('orders', 'subtotal')) {
+                    $row->decimal('subtotal', 15, 2)->nullable();
+                }
+                if (!Schema::hasColumn('orders', 'delivery_fee')) {
+                    $row->decimal('delivery_fee', 15, 2)->default(0);
+                }
+                if (!Schema::hasColumn('orders', 'tax_amount')) {
+                    $row->decimal('tax_amount', 15, 2)->default(0);
+                }
+                if (!Schema::hasColumn('orders', 'coupon_discount')) {
+                    $row->decimal('coupon_discount', 15, 2)->default(0);
+                }
+                if (!Schema::hasColumn('orders', 'coupon_code')) {
+                    $row->string('coupon_code')->nullable();
+                }
+                if (!Schema::hasColumn('orders', 'platform_fee')) {
+                    $row->decimal('platform_fee', 15, 2)->default(0);
+                }
+                if (!Schema::hasColumn('orders', 'packaging_fee')) {
+                    $row->decimal('packaging_fee', 15, 2)->default(0);
+                }
+            });
         }
 
         if (!Schema::hasTable('order_items')) {

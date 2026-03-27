@@ -24,7 +24,8 @@ class CategoryRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'image' => 'nullable|string',
-            'status' => 'boolean'
+            'status' => 'boolean',
+            'merchant_id' => 'nullable|exists:merchants,id'
         ];
     }
 }

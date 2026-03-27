@@ -79,10 +79,10 @@ class RiderController extends Controller
 
             // 1. If merchant, only show their riders
             if ($user->role === User::ROLE_MERCHANT) {
-                $query->where('merchant_id', $user->id);
+                $query->where('merchant_id', $user->merchant?->id);
             } 
             // 2. If Admin with merchant_id filter
-            elseif ($user->role === User::ROLE_ADMIN && $request->has('merchant_id')) {
+            elseif ($user->role === User::ROLE_ADMIN && $request->filled('merchant_id')) {
                 $query->where('merchant_id', $request->merchant_id);
             }
 

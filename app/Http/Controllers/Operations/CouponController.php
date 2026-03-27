@@ -78,7 +78,8 @@ class CouponController extends Controller
             'value' => 'required|numeric',
             'min_order_amount' => 'required|numeric',
             'expires_at' => 'required|date',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
+            'merchant_id' => 'nullable|exists:merchants,id'
         ]);
 
         if ($request->user()->role === 'merchant') {
@@ -108,7 +109,8 @@ class CouponController extends Controller
             'value' => 'sometimes|numeric',
             'min_order_amount' => 'sometimes|numeric',
             'expires_at' => 'sometimes|date',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
+            'merchant_id' => 'nullable|exists:merchants,id'
         ]);
 
         $coupon->update($validated);

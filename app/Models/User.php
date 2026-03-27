@@ -30,7 +30,8 @@ class User extends Authenticatable
         'current_latitude',
         'current_longitude',
         'is_ready',
-        'fcm_token'
+        'fcm_token',
+        'merchant_id'
     ];
 
     /**
