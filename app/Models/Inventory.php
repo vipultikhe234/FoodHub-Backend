@@ -2,19 +2,40 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Inventory extends Model
 {
-    use HasFactory;
+    protected $table = 'inventories';
 
-    protected $table = 'inventory';
+    protected $fillable = [
+        'product_variant_id',
+        'merchant_id',
+        'stock',
+        'reserved_stock',
+        'is_available',
+    ];
 
-    protected $fillable = ['product_id', 'quantity', 'low_stock_alert'];
+    protected $casts = [
+        'stock' => 'integer',
+        'reserved_stock' => 'integer',
+        'is_available' => 'boolean',
+    ];
 
-    public function product()
+    public function variant(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+    }
+
+    public function merchant(): BelongsTo
+    {
+        return $this->belongsTo(Merchant::class);
+    }
+
+    public function scopeAvailable($query)
+    {
+        return $query->where('is_available', true)
+                     ->whereRaw('stock - reserved_stock > 0');
     }
 }

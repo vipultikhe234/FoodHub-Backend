@@ -19,6 +19,9 @@ class CategoryResource extends JsonResource
                     : asset('storage/' . $this->image))
                 : null,
             'status' => (bool) $this->status,
+            'merchant_id' => $this->merchant_id,
+            'merchant' => $this->whenLoaded('merchant'),
         ];
     }
 }
+

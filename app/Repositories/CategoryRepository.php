@@ -7,9 +7,9 @@ use Illuminate\Database\Eloquent\Collection;
 
 class CategoryRepository
 {
-    public function getAll(): Collection
+    public function getAll($MerchantId = null): Collection
     {
-        return Category::all();
+        return Category::byMerchant($MerchantId)->latest()->get();
     }
 
     public function findById(int $id): ?Category
@@ -36,3 +36,4 @@ class CategoryRepository
         return Category::destroy($id) > 0;
     }
 }
+
