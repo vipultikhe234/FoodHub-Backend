@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reviews', function (Blueprint $table) {
-            $table->foreignId('product_id')->nullable()->after('merchant_id')->constrained()->cascadeOnDelete();
+            if (!Schema::hasColumn('reviews', 'product_id')) {
+                $table->foreignId('product_id')->nullable()->after('merchant_id')->constrained()->cascadeOnDelete();
+            }
         });
     }
 

@@ -12,15 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('offers', function (Blueprint $table) {
-            $table->foreignId('category_id')->nullable()->after('merchant_id')->constrained('categories')->nullOnDelete();
-            $table->foreignId('product_id')->nullable()->after('category_id')->constrained('products')->nullOnDelete();
-            $table->string('banner_url')->nullable()->after('image'); // Will eventually replace image
-            $table->enum('discount_type', ['percentage', 'flat'])->default('percentage')->after('banner_url');
-            $table->decimal('discount_value', 10, 2)->default(0)->after('discount_type');
-            $table->integer('priority')->default(0)->after('discount_value');
-            $table->integer('usage_count')->default(0)->after('priority');
-            $table->timestamp('start_date')->nullable()->after('usage_count');
-            $table->timestamp('end_date')->nullable()->after('start_date');
+            if (!Schema::hasColumn('offers', 'category_id')) {
+                $table->foreignId('category_id')->nullable()->after('merchant_id')->constrained('categories')->nullOnDelete();
+                $table->foreignId('product_id')->nullable()->after('category_id')->constrained('products')->nullOnDelete();
+                $table->string('banner_url')->nullable()->after('image'); // Will eventually replace image
+                $table->enum('discount_type', ['percentage', 'flat'])->default('percentage')->after('banner_url');
+                $table->decimal('discount_value', 10, 2)->default(0)->after('discount_type');
+                $table->integer('priority')->default(0)->after('discount_value');
+                $table->integer('usage_count')->default(0)->after('priority');
+                $table->timestamp('start_date')->nullable()->after('usage_count');
+                $table->timestamp('end_date')->nullable()->after('start_date');
+            }
         });
     }
 
