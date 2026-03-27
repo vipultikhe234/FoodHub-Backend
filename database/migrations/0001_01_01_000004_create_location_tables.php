@@ -11,35 +11,41 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('countries', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->string('code', 10)->unique();
-            $table->string('currency', 10)->nullable();
-            $table->string('symbol', 10)->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('countries')) {
+            Schema::create('countries', function (Blueprint $table) {
+                $table->id();
+                $table->string('name')->unique();
+                $table->string('code', 10)->unique();
+                $table->string('currency', 10)->nullable();
+                $table->string('symbol', 10)->nullable();
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+            });
+        }
 
-        Schema::create('states', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('country_id')->constrained()->onDelete('cascade');
-            $table->string('name');
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-            
-            $table->unique(['country_id', 'name']);
-        });
+        if (!Schema::hasTable('states')) {
+            Schema::create('states', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('country_id')->constrained()->onDelete('cascade');
+                $table->string('name');
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+                
+                $table->unique(['country_id', 'name']);
+            });
+        }
 
-        Schema::create('cities', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('state_id')->constrained()->onDelete('cascade');
-            $table->string('name');
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-            
-            $table->unique(['state_id', 'name']);
-        });
+        if (!Schema::hasTable('cities')) {
+            Schema::create('cities', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('state_id')->constrained()->onDelete('cascade');
+                $table->string('name');
+                $table->boolean('is_active')->default(true);
+                $table->timestamps();
+                
+                $table->unique(['state_id', 'name']);
+            });
+        }
     }
 
     /**
