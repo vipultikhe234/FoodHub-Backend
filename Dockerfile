@@ -40,8 +40,8 @@ RUN mkdir -p storage bootstrap/cache && \
 EXPOSE 8000
 
 # Cache configurations, run migrations safely, and start the development server
-CMD php artisan optimize:clear && \
-    php artisan optimize && \
+CMD (php artisan optimize:clear || true) && \
     php artisan migrate --force && \
+    (php artisan optimize || true) && \
     (php artisan db:seed --class=DatabaseSeeder --force || true) && \
     php artisan serve --host=0.0.0.0 --port=8000
