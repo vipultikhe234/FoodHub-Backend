@@ -9,7 +9,7 @@ class CategoryRepository
 {
     public function getAll($MerchantId = null): Collection
     {
-        return Category::byMerchant($MerchantId)->latest()->get();
+        return Category::byMerchant($MerchantId)->with('merchant.merchantCategory')->latest()->get();
     }
 
     public function findById(int $id): ?Category

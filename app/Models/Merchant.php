@@ -18,6 +18,7 @@ class Merchant extends Model
         'state_id',
         'city_id',
         'image',
+        'merchant_category_id',
         'is_open',
         'is_active',
         'opening_time',
@@ -58,6 +59,11 @@ class Merchant extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function merchantCategory(): BelongsTo
+    {
+        return $this->belongsTo(MerchantCategory::class, 'merchant_category_id');
     }
 
     public function otherCharges(): HasOne

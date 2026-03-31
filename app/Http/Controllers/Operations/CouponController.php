@@ -63,7 +63,7 @@ class CouponController extends Controller
     public function index(Request $request)
     {
         $MerchantId = $request->query('merchant_id');
-        $coupons = Coupon::byMerchant($MerchantId)->latest()->get();
+        $coupons = Coupon::byMerchant($MerchantId)->with('merchant.merchantCategory')->latest()->get();
 
         return response()->json([
             'data' => $coupons

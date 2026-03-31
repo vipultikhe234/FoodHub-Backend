@@ -16,7 +16,7 @@ class MerchantController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Merchant::with(['city.state.country', 'otherCharges'])
+        $query = Merchant::with(['merchantCategory', 'city.state.country', 'otherCharges'])
             ->where('is_active', true);
 
         if ($request->has('city_id')) {
@@ -31,7 +31,7 @@ class MerchantController extends Controller
      */
     public function showPublic($id)
     {
-        $Merchant = Merchant::with(['city.state.country', 'otherCharges'])
+        $Merchant = Merchant::with(['merchantCategory', 'city.state.country', 'otherCharges'])
             ->where('is_active', true)
             ->findOrFail($id);
 
@@ -43,7 +43,7 @@ class MerchantController extends Controller
      */
     public function show(Request $request)
     {
-        $merchant = $request->user()->merchant()->with(['user', 'otherCharges'])->first();
+        $merchant = $request->user()->merchant()->with(['user', 'merchantCategory', 'otherCharges'])->first();
         
         if (!$merchant) {
             return response()->json(['message' => 'No merchant node found for this identity.'], 404);
@@ -139,6 +139,7 @@ class MerchantController extends Controller
             'delivery_charge_tax'   => 'nullable|numeric',
             'packaging_charge_tax'  => 'nullable|numeric',
             'platform_fee_tax'      => 'nullable|numeric',
+            'merchant_category_id' => 'nullable|exists:merchant_categories,id',
         ]);
 
         return DB::transaction(function () use ($validated) {
@@ -161,6 +162,7 @@ class MerchantController extends Controller
                 'image'        => $validated['image'] ?? 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5',
                 'opening_time' => $validated['opening_time'] ?? '09:00:00',
                 'closing_time' => $validated['closing_time'] ?? '22:00:00',
+                'merchant_category_id' => $validated['merchant_category_id'] ?? null,
                 'is_open'      => true,
             ]);
 
@@ -176,7 +178,7 @@ class MerchantController extends Controller
 
             return response()->json([
                 'message'    => 'Merchant ecosystem provisioned successfully.',
-                'merchant' => $merchant->load(['user', 'city.state.country', 'otherCharges'])
+                'merchant' => $merchant->load(['user', 'merchantCategory', 'city.state.country', 'otherCharges'])
             ], 201);
         });
     }
@@ -211,6 +213,7 @@ class MerchantController extends Controller
             'delivery_charge_type'  => 'nullable|in:fixed,distance',
             'delivery_charge_per_km'=> 'nullable|numeric',
             'max_delivery_distance' => 'nullable|numeric',
+            'merchant_category_id'  => 'nullable|exists:merchant_categories,id',
         ]);
 
         return DB::transaction(function () use ($validated, $merchant, $request) {
@@ -236,6 +239,7 @@ class MerchantController extends Controller
             if (isset($validated['closing_time'])) $restData['closing_time'] = $validated['closing_time'];
             if (isset($validated['latitude'])) $restData['latitude'] = $validated['latitude'];
             if (isset($validated['longitude'])) $restData['longitude'] = $validated['longitude'];
+            if (array_key_exists('merchant_category_id', $validated)) $restData['merchant_category_id'] = $validated['merchant_category_id'];
             
             $merchant->update($restData);
 
@@ -255,7 +259,7 @@ class MerchantController extends Controller
 
             return response()->json([
                 'message'    => 'Merchant ecosystem updated successfully.',
-                'merchant' => $merchant->load(['user', 'city.state.country', 'otherCharges'])
+                'merchant' => $merchant->load(['user', 'merchantCategory', 'city.state.country', 'otherCharges'])
             ]);
         });
     }
@@ -265,7 +269,7 @@ class MerchantController extends Controller
      */
     public function listAll()
     {
-        return response()->json(['data' => Merchant::with(['user', 'city.state.country', 'otherCharges'])->latest()->get()]);
+        return response()->json(['data' => Merchant::with(['user', 'merchantCategory', 'city.state.country', 'otherCharges'])->latest()->get()]);
     }
 
     /**

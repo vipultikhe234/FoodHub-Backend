@@ -11,14 +11,14 @@ class ProductRepository
     {
         return Product::byMerchant($merchantId)
             ->active()
-            ->with(['category', 'merchant', 'variants.inventories'])
+            ->with(['category', 'merchant.merchantCategory', 'variants.inventories'])
             ->latest()
             ->get();
     }
 
     public function findById(int $id): ?Product
     {
-        return Product::with(['category', 'merchant', 'reviews.user', 'variants.inventories'])
+        return Product::with(['category', 'merchant.merchantCategory', 'reviews.user', 'variants.inventories'])
             ->find($id);
     }
 
@@ -55,7 +55,7 @@ class ProductRepository
             ->whereColumn('discount_price', '<', 'price')
             ->selectRaw('*, (price - discount_price) as discount_value')
             ->orderBy('discount_value', 'desc')
-            ->with(['category', 'merchant', 'variants.inventories', 'reviews'])
+            ->with(['category', 'merchant.merchantCategory', 'variants.inventories', 'reviews'])
             ->limit(10)
             ->get();
 
@@ -66,7 +66,7 @@ class ProductRepository
             ->selectRaw('products.*, SUM(COALESCE(order_items.quantity, 0)) as sales_volume')
             ->groupBy('products.id')
             ->orderBy('sales_volume', 'desc')
-            ->with(['category', 'merchant', 'variants.inventories', 'reviews'])
+            ->with(['category', 'merchant.merchantCategory', 'variants.inventories', 'reviews'])
             ->limit(10)
             ->get();
 
@@ -78,7 +78,7 @@ class ProductRepository
         if ($merged->count() < 5) {
             $latest = Product::active()
                 ->where('is_available', true)
-                ->with(['category', 'merchant', 'variants.inventories', 'reviews'])
+                ->with(['category', 'merchant.merchantCategory', 'variants.inventories', 'reviews'])
                 ->latest()
                 ->limit(10)
                 ->get();

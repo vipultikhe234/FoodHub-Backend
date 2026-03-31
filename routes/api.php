@@ -23,6 +23,7 @@ use App\Http\Controllers\Analytics\DashboardController;
 
 use App\Http\Controllers\Management\MerchantController;
 use App\Http\Controllers\Management\LocationController;
+use App\Http\Controllers\Management\MerchantCategoryController;
 use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\AIController;
 
@@ -44,6 +45,7 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/merchants', [MerchantController::class, 'index']);
 Route::get('/merchants/{id}', [MerchantController::class, 'showPublic']);
 Route::get('/merchants/{id}/reviews', [MerchantController::class, 'reviews']);
+Route::get('/merchant-categories', [MerchantCategoryController::class, 'index']);
 Route::get('/live-offers', [OfferController::class, 'index']);
 Route::post('/live-offers/{id}/click', [OfferController::class, 'recordClick']);
 Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle']);
@@ -127,6 +129,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/admin/locations/cities',          [LocationController::class, 'storeCity']);
         Route::put('/admin/locations/cities/{id}',      [LocationController::class, 'updateCity']);
         Route::delete('/admin/locations/cities/{id}',   [LocationController::class, 'destroyCity']);
+
+        // Merchant Business Categories (Admin Master)
+        Route::get('/admin/merchant-categories',         [MerchantCategoryController::class, 'index']);
+        Route::post('/admin/merchant-categories',        [MerchantCategoryController::class, 'store']);
+        Route::put('/admin/merchant-categories/{id}',   [MerchantCategoryController::class, 'update']);
+        Route::delete('/admin/merchant-categories/{id}',[MerchantCategoryController::class, 'destroy']);
+        Route::patch('/admin/merchant-categories/{id}/toggle', [MerchantCategoryController::class, 'toggleStatus']);
     });
 
     // --- Merchant Node Control ---
