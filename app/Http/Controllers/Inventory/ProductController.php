@@ -25,19 +25,21 @@ class ProductController extends Controller
     {
         $role = $request->user('sanctum')?->role ?? 'guest';
         $targetId = $request->query('merchant_id');
+        $cityId = $request->query('city_id');
 
         // Multidimensional Cache Key
-        $cacheKey = "products_r_" . ($targetId ?? 'all') . "_role_" . $role;
+        $cacheKey = "products_r_" . ($targetId ?? 'all') . "_city_" . ($cityId ?? 'all') . "_role_" . $role;
 
-        return Cache::remember($cacheKey, 3600, function () use ($targetId) {
-            $products = $this->service->getAllProducts($targetId);
+        return Cache::remember($cacheKey, 3600, function () use ($targetId, $cityId) {
+            $products = $this->service->getAllProducts($targetId, $cityId);
             return ProductResource::collection($products);
         });
     }
 
-    public function curated()
+    public function curated(Request $request)
     {
-        $products = $this->service->getCuratedProducts();
+        $cityId = $request->query('city_id');
+        $products = $this->service->getCuratedProducts($cityId);
         return ProductResource::collection($products);
     }
 

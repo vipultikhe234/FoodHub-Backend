@@ -23,6 +23,10 @@ class MerchantController extends Controller
             $query->where('city_id', $request->city_id);
         }
 
+        if ($request->has('merchant_category_id')) {
+            $query->where('merchant_category_id', $request->merchant_category_id);
+        }
+
         return response()->json(['data' => $query->latest()->get()]);
     }
 
@@ -315,42 +319,49 @@ class MerchantController extends Controller
     }
 
     /**
-     * Submit a review for a merchant (Authenticated user with delivered order).
+     * Submit a review for a merchant (Enforces High-Rating Persistence).
      */
     public function addReview(Request $request, $id)
     {
         $request->validate([
-            'order_id' => 'required|integer|exists:orders,id',
+            'order_id' => 'nullable|integer|exists:orders,id',
             'rating'   => 'required|integer|min:1|max:5',
             'review'   => 'nullable|string|max:1000',
         ]);
 
-        // Verify order: belongs to user, belongs to merchant, and is delivered
-        $order = \App\Models\Order::where('id', $request->order_id)
-            ->where('user_id', $request->user()->id)
+        $userId = $request->user()->id;
+        
+        // Find existing review for this user and merchant
+        $existing = \App\Models\Review::where('user_id', $userId)
             ->where('merchant_id', $id)
-            ->where('status', 'delivered')
-            ->first();
-
-        if (!$order) {
-            return response()->json([
-                'message' => 'You can only review a merchant after a delivered order.'
-            ], 403);
-        }
-
-        // Prevent duplicate review for same order
-        $existing = \App\Models\Review::where('user_id', $request->user()->id)
-            ->where('order_id', $order->id)
             ->first();
 
         if ($existing) {
-            return response()->json(['message' => 'You have already reviewed this order.'], 409);
+            // Only update if the new rating is HIGHER than before
+            if ($request->rating > $existing->rating) {
+                $existing->update([
+                    'rating'   => $request->rating,
+                    'review'   => $request->review ?? $existing->review,
+                    'order_id' => $request->order_id ?? $existing->order_id,
+                ]);
+
+                return response()->json([
+                    'message' => 'Your review has been upgraded to a higher rating!',
+                    'data'    => new \App\Http\Resources\ReviewResource($existing->load('user')),
+                ], 200);
+            }
+
+            return response()->json([
+                'message' => 'Your highest rating for this merchant is already recorded.',
+                'data'    => new \App\Http\Resources\ReviewResource($existing->load('user')),
+            ], 200);
         }
 
+        // Create new review if none exists
         $review = \App\Models\Review::create([
-            'user_id'     => $request->user()->id,
+            'user_id'     => $userId,
             'merchant_id' => $id,
-            'order_id'    => $order->id,
+            'order_id'    => $request->order_id,
             'rating'      => $request->rating,
             'review'      => $request->review,
         ]);

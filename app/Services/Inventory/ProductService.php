@@ -10,9 +10,9 @@ class ProductService
         protected ProductRepository $repository
     ) {}
 
-    public function getAllProducts($MerchantId = null)
+    public function getAllProducts($merchantId = null, $cityId = null)
     {
-        return $this->repository->getAll($MerchantId);
+        return $this->repository->getAll($merchantId, $cityId);
     }
 
     public function getProductById($id)
@@ -35,9 +35,9 @@ class ProductService
         return $this->repository->delete($id);
     }
 
-    public function getCuratedProducts()
+    public function getCuratedProducts($cityId = null)
     {
-        return $this->repository->getCuratedProducts();
+        return $this->repository->getCuratedProducts($cityId);
     }
 }
 

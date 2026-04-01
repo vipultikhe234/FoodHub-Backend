@@ -36,6 +36,10 @@ class LocationController extends Controller
             $query->where('state_id', $request->state_id);
         }
 
+        if ($request->boolean('has_merchants')) {
+            $query->has('Merchants');
+        }
+
         return response()->json($query->get());
     }
 

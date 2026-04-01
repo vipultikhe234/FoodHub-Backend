@@ -33,7 +33,8 @@ use App\Http\Controllers\Api\AIController;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/ping', function() { return response()->json(['status' => 'ok']); });
+Route::get('/ping', function () {
+    return response()->json(['status' => 'ok']); });
 
 // 0. Public Gateway (Non-Authenticated)
 Route::post('/register', [AuthController::class, 'register']);
@@ -52,12 +53,12 @@ Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle']);
 
 // Public location endpoints (for cascading dropdowns in registration / profile)
 Route::get('/locations/countries', [LocationController::class, 'countries']);
-Route::get('/locations/states',    [LocationController::class, 'states']);
-Route::get('/locations/cities',    [LocationController::class, 'cities']);
+Route::get('/locations/states', [LocationController::class, 'states']);
+Route::get('/locations/cities', [LocationController::class, 'cities']);
 
 // 1. Authenticated Secure Context
 Route::middleware('auth:sanctum')->group(function () {
-    
+
     // --- Identity & Access Management (IAM) ---
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
@@ -76,7 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Merchant-level review (scoped by product to derive merchant)
     Route::post('/products/{id}/reviews', [ProductController::class, 'addReview']);
     Route::post('/merchants/{id}/reviews', [MerchantController::class, 'addReview']);
-    
+
     Route::post('/categories', [CategoryController::class, 'store']);
     Route::put('/categories/{id}', [CategoryController::class, 'update']);
     Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
@@ -88,13 +89,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::patch('/orders/{id}/payment-status', [OrderController::class, 'updatePaymentStatus']);
     Route::post('/payments/confirm', [StripeWebhookController::class, 'confirmPayment']);
-    
+
     Route::get('/coupons', [CouponController::class, 'index']);
     Route::post('/coupons', [CouponController::class, 'store']);
     Route::put('/coupons/{id}', [CouponController::class, 'update']);
     Route::delete('/coupons/{id}', [CouponController::class, 'destroy']);
     Route::post('/coupons/validate', [CouponController::class, 'validateCoupon']);
-    
+
     Route::get('/offers', [OfferController::class, 'listAll']);
     Route::post('/offers', [OfferController::class, 'store']);
     Route::put('/offers/{id}', [OfferController::class, 'update']);
@@ -115,33 +116,40 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/admin/onboard-rider', [OnboardingController::class, 'adminOnboardRider']);
 
         // Location Master CRUD
-        Route::get('/admin/locations/countries',         [LocationController::class, 'allCountries']);
-        Route::post('/admin/locations/countries',        [LocationController::class, 'storeCountry']);
-        Route::put('/admin/locations/countries/{id}',   [LocationController::class, 'updateCountry']);
-        Route::delete('/admin/locations/countries/{id}',[LocationController::class, 'destroyCountry']);
+        Route::get('/admin/locations/countries', [LocationController::class, 'allCountries']);
+        Route::post('/admin/locations/countries', [LocationController::class, 'storeCountry']);
+        Route::put('/admin/locations/countries/{id}', [LocationController::class, 'updateCountry']);
+        Route::delete('/admin/locations/countries/{id}', [LocationController::class, 'destroyCountry']);
 
-        Route::get('/admin/locations/states',           [LocationController::class, 'allStates']);
-        Route::post('/admin/locations/states',          [LocationController::class, 'storeState']);
-        Route::put('/admin/locations/states/{id}',      [LocationController::class, 'updateState']);
-        Route::delete('/admin/locations/states/{id}',   [LocationController::class, 'destroyState']);
+        Route::get('/admin/locations/states', [LocationController::class, 'allStates']);
+        Route::post('/admin/locations/states', [LocationController::class, 'storeState']);
+        Route::put('/admin/locations/states/{id}', [LocationController::class, 'updateState']);
+        Route::delete('/admin/locations/states/{id}', [LocationController::class, 'destroyState']);
 
-        Route::get('/admin/locations/cities',           [LocationController::class, 'allCities']);
-        Route::post('/admin/locations/cities',          [LocationController::class, 'storeCity']);
-        Route::put('/admin/locations/cities/{id}',      [LocationController::class, 'updateCity']);
-        Route::delete('/admin/locations/cities/{id}',   [LocationController::class, 'destroyCity']);
+        Route::get('/admin/locations/cities', [LocationController::class, 'allCities']);
+        Route::post('/admin/locations/cities', [LocationController::class, 'storeCity']);
+        Route::put('/admin/locations/cities/{id}', [LocationController::class, 'updateCity']);
+        Route::delete('/admin/locations/cities/{id}', [LocationController::class, 'destroyCity']);
 
         // Merchant Business Categories (Admin Master)
-        Route::get('/admin/merchant-categories',         [MerchantCategoryController::class, 'index']);
-        Route::post('/admin/merchant-categories',        [MerchantCategoryController::class, 'store']);
-        Route::put('/admin/merchant-categories/{id}',   [MerchantCategoryController::class, 'update']);
-        Route::delete('/admin/merchant-categories/{id}',[MerchantCategoryController::class, 'destroy']);
+        Route::get('/admin/merchant-categories', [MerchantCategoryController::class, 'index']);
+        Route::post('/admin/merchant-categories', [MerchantCategoryController::class, 'store']);
+        Route::put('/admin/merchant-categories/{id}', [MerchantCategoryController::class, 'update']);
+        Route::delete('/admin/merchant-categories/{id}', [MerchantCategoryController::class, 'destroy']);
         Route::patch('/admin/merchant-categories/{id}/toggle', [MerchantCategoryController::class, 'toggleStatus']);
+        
+        // --- Centralized Review Management (Admin) ---
+        Route::get('admin/reviews', [\App\Http\Controllers\Operations\ReviewController::class, 'index']);
+        Route::get('admin/reviews/stats', [\App\Http\Controllers\Operations\ReviewController::class, 'stats']);
+        Route::delete('admin/reviews/{id}', [\App\Http\Controllers\Operations\ReviewController::class, 'destroy']);
     });
 
     // --- Merchant Node Control ---
     Route::middleware('merchant')->group(function () {
         Route::get('/merchant/profile', [MerchantController::class, 'show']);
         Route::put('/merchant/profile', [MerchantController::class, 'update']);
+        Route::get('/merchant/reviews', [\App\Http\Controllers\Operations\ReviewController::class, 'index']);
+        Route::get('/merchant/reviews/stats', [\App\Http\Controllers\Operations\ReviewController::class, 'stats']);
         Route::post('/merchant/onboard-rider', [OnboardingController::class, 'merchantOnboardRider']);
     });
 
