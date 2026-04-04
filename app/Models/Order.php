@@ -82,6 +82,11 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function logs()
+    {
+        return $this->hasMany(OrderStatusLog::class);
+    }
+
     public function payment()
     {
         return $this->hasOne(Payment::class);

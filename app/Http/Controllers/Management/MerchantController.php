@@ -16,7 +16,7 @@ class MerchantController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Merchant::with(['merchantCategory', 'city.state.country', 'otherCharges'])
+        $query = Merchant::with(['merchantCategory', 'city.state.country', 'other_charges'])
             ->where('is_active', true);
 
         if ($request->has('city_id')) {
@@ -35,7 +35,7 @@ class MerchantController extends Controller
      */
     public function showPublic($id)
     {
-        $Merchant = Merchant::with(['merchantCategory', 'city.state.country', 'otherCharges'])
+        $Merchant = Merchant::with(['merchantCategory', 'city.state.country', 'other_charges'])
             ->where('is_active', true)
             ->findOrFail($id);
 
@@ -47,7 +47,7 @@ class MerchantController extends Controller
      */
     public function show(Request $request)
     {
-        $merchant = $request->user()->merchant()->with(['user', 'merchantCategory', 'otherCharges'])->first();
+        $merchant = $request->user()->merchant()->with(['user', 'merchantCategory', 'other_charges'])->first();
         
         if (!$merchant) {
             return response()->json(['message' => 'No merchant node found for this identity.'], 404);
@@ -107,7 +107,7 @@ class MerchantController extends Controller
             ]);
 
             if (!empty($chargeData)) {
-                $merchant->otherCharges()->updateOrCreate(
+                $merchant->other_charges()->updateOrCreate(
                     ['merchant_id' => $merchant->id],
                     $chargeData
                 );
@@ -171,7 +171,7 @@ class MerchantController extends Controller
             ]);
 
             // 3. Create initial charges
-            $merchant->otherCharges()->create([
+            $merchant->other_charges()->create([
                 'delivery_charge'       => $validated['delivery_charge'] ?? 20.00,
                 'packaging_charge'      => $validated['packaging_charge'] ?? 10.00,
                 'platform_fee'          => $validated['platform_fee'] ?? 5.00,
@@ -182,7 +182,7 @@ class MerchantController extends Controller
 
             return response()->json([
                 'message'    => 'Merchant ecosystem provisioned successfully.',
-                'merchant' => $merchant->load(['user', 'merchantCategory', 'city.state.country', 'otherCharges'])
+                'merchant' => $merchant->load(['user', 'merchantCategory', 'city.state.country', 'other_charges'])
             ], 201);
         });
     }
@@ -255,7 +255,7 @@ class MerchantController extends Controller
             ]);
 
             if (!empty($chargeData)) {
-                $merchant->otherCharges()->updateOrCreate(
+                $merchant->other_charges()->updateOrCreate(
                     ['merchant_id' => $merchant->id],
                     $chargeData
                 );
@@ -263,7 +263,7 @@ class MerchantController extends Controller
 
             return response()->json([
                 'message'    => 'Merchant ecosystem updated successfully.',
-                'merchant' => $merchant->load(['user', 'merchantCategory', 'city.state.country', 'otherCharges'])
+                'merchant' => $merchant->load(['user', 'merchantCategory', 'city.state.country', 'other_charges'])
             ]);
         });
     }
@@ -273,7 +273,7 @@ class MerchantController extends Controller
      */
     public function listAll()
     {
-        return response()->json(['data' => Merchant::with(['user', 'merchantCategory', 'city.state.country', 'otherCharges'])->latest()->get()]);
+        return response()->json(['data' => Merchant::with(['user', 'merchantCategory', 'city.state.country', 'other_charges'])->latest()->get()]);
     }
 
     /**

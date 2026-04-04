@@ -66,7 +66,7 @@ class Merchant extends Model
         return $this->belongsTo(MerchantCategory::class, 'merchant_category_id');
     }
 
-    public function otherCharges(): HasOne
+    public function other_charges(): HasOne
     {
         return $this->hasOne(MerchantOtherCharge::class, 'merchant_id');
     }

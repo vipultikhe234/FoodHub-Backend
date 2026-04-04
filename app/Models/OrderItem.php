@@ -17,9 +17,9 @@ class OrderItem extends Model
         'variant_name',
         'image_url',
         'mrp_price',
-        'unit_price',
+        'price',
         'quantity',
-        'total_price',
+        'total',
         'tax_amount',
         'discount_amount',
         'fulfilled_quantity',
@@ -27,8 +27,8 @@ class OrderItem extends Model
 
     protected $casts = [
         'mrp_price' => 'decimal:2',
-        'unit_price' => 'decimal:2',
-        'total_price' => 'decimal:2',
+        'price' => 'decimal:2',
+        'total' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
     ];

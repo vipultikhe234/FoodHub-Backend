@@ -41,6 +41,7 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/products/curated', [ProductController::class, 'curated']);
 Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/barcode-lookup/{barcode}', [ProductController::class, 'lookupBarcode']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/merchants', [MerchantController::class, 'index']);

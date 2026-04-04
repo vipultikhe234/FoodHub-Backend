@@ -15,6 +15,10 @@ use Carbon\Carbon;
 
 class CheckoutService
 {
+    public function __construct(
+        protected \App\Services\Identity\FCMService $fcmService
+    ) {}
+
     /**
      * Complete the checkout process in a single atomic transaction.
      * Follows the 'ACID Path' with stock reservation and data snapshotting.
@@ -23,43 +27,35 @@ class CheckoutService
     {
         return DB::transaction(function () use ($data, $user) {
             // 1. Resolve Global Entities
-            $Merchant = Merchant::findOrFail($data['merchant_id']);
+            $Merchant = Merchant::with('user')->findOrFail($data['merchant_id']);
             $address = UserAddress::find($data['address_id']);
             
             // 2. Initial Calculations
             $subtotal = 0;
-            $itemsData = [];
             
-            // 3. Process Items & Lock Inventory
+            // 3. Process Items & Resolve Stock
             foreach ($data['items'] as $item) {
-                // Precise locking to prevent race conditions during checkout
+                $itemSubtotal = $item['unit_price'] * $item['quantity'];
+                $subtotal += $itemSubtotal;
+
+                // Resolve Stock Context (Inventory Table vs Product Master)
                 $inventory = Inventory::where('product_variant_id', $item['product_variant_id'])
                     ->where('merchant_id', $Merchant->id)
                     ->lockForUpdate()
                     ->first();
 
-                if (!$inventory || ($inventory->stock - $inventory->reserved_stock) < $item['quantity']) {
-                    throw new \Exception("Item '{$item['product_name']}' is out of stock in required quantity.");
+                if ($inventory) {
+                    if (($inventory->stock - $inventory->reserved_stock) < $item['quantity']) {
+                        throw new \Exception("Item '{$item['product_name']}' is out of stock in required quantity.");
+                    }
+                    $inventory->increment('reserved_stock', $item['quantity']);
+                } else {
+                    $product = \App\Models\Product::find($item['product_id']);
+                    if (!$product || $product->stock < $item['quantity']) {
+                        throw new \Exception("Item '{$item['product_name']}' is currently out of stock.");
+                    }
+                    $product->decrement('stock', $item['quantity']);
                 }
-
-                $itemSubtotal = $item['unit_price'] * $item['quantity'];
-                $subtotal += $itemSubtotal;
-
-                // Snapshot item data
-                $itemsData[] = [
-                    'product_id' => $item['product_id'],
-                    'product_variant_id' => $item['product_variant_id'],
-                    'product_name' => $item['product_name'],
-                    'variant_name' => $item['variant_name'],
-                    'image_url' => $item['image_url'] ?? null,
-                    'mrp_price' => $item['mrp_price'] ?? $item['unit_price'],
-                    'unit_price' => $item['unit_price'],
-                    'quantity' => $item['quantity'],
-                    'total_price' => $itemSubtotal,
-                ];
-
-                // Increment Reserved Stock
-                $inventory->increment('reserved_stock', $item['quantity']);
             }
 
             // 4. Resolve Fees & Discounts
@@ -87,8 +83,15 @@ class CheckoutService
 
             $totalAmount = ($subtotal + $deliveryFee + $packingCharge + $platformFee + $taxAmount) - $discountAmount;
 
-            // 5. Create Order Header — matching actual `orders` table columns
+            // Generate Unique Order Number (3 random chars + 7 random digits)
+            do {
+                $orderNumber = strtoupper(Str::random(3)) . rand(1000000, 9999999);
+            } while (Order::where('order_number', $orderNumber)->exists());
+
+            // 5. Create Order Header
             $order = Order::create([
+                'order_number'     => $orderNumber,
+                'idempotency_key'  => $data['idempotency_key'] ?? null,
                 'user_id'          => $user->id,
                 'merchant_id'      => $Merchant->id,
                 'subtotal'         => $subtotal,
@@ -100,34 +103,43 @@ class CheckoutService
                 'coupon_code'      => $data['coupon_code'] ?? null,
                 'total_price'      => $totalAmount,
                 'address_id'       => $address?->id,
-                'address_snapshot' => $address
-                    ? json_encode([
-                        'line'     => $address->address_line,
-                        'landmark' => $address->landmark,
-                        'city'     => $address->city,
-                        'pincode'  => $address->pincode,
-                    ])
-                    : json_encode(['note' => 'Pickup']),
                 'payment_method'   => $data['payment_method'] ?? 'COD',
                 'payment_status'   => 'pending',
-                'status'           => 'pending',
+                'status'           => 'placed',
                 'order_type'       => $address ? 'delivery' : 'pickup',
                 'notes'            => $data['notes'] ?? null,
             ]);
 
-            // 6. Bulk Create Items
-            foreach ($itemsData as &$itemData) {
-                $itemData['order_id'] = $order->id;
-                OrderItem::create($itemData);
+            // 6. Bulk Create Items - only using DB columns
+            foreach ($data['items'] as $item) {
+                OrderItem::create([
+                    'order_id'           => $order->id,
+                    'product_id'        => $item['product_id'],
+                    'product_variant_id'=> $item['product_variant_id'],
+                    'quantity'          => $item['quantity'],
+                    'price'             => $item['unit_price'],
+                    'total'             => $item['unit_price'] * $item['quantity'],
+                ]);
             }
 
             // 7. Initialize Log
             $order->logs()->create([
                 'status' => 'placed',
-                'notes' => 'Checkout finalized. Awaiting payment.',
+                'notes' => 'Order placed successfully. Awaiting merchant acceptance.',
                 'changed_by_type' => 'user',
                 'changed_by_id' => $user->id
             ]);
+
+            // 8. Real-time Merchant Notification
+            if ($Merchant->user && $Merchant->user->fcm_token) {
+                $this->fcmService->sendNotification(
+                    $Merchant->user->fcm_token,
+                    '🚀 New Order!',
+                    "New order #{$order->order_number} received from {$user->name}",
+                    ['type' => 'new_order', 'order_id' => (string)$order->id],
+                    $Merchant->user->id
+                );
+            }
 
             return $order;
         });

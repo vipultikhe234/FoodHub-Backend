@@ -49,7 +49,7 @@ class StripeWebhookController extends Controller
 
             $order->update([
                 'payment_status' => 'paid',
-                'status'         => 'preparing',
+                'status'         => 'placed',
             ]);
 
             $order->payment()->update([
@@ -91,7 +91,7 @@ class StripeWebhookController extends Controller
                 $pi    = $event->data->object;
                 $order = Order::find($pi->metadata->order_id);
                 if ($order) {
-                    $order->update(['payment_status' => 'paid', 'status' => 'preparing']);
+                    $order->update(['payment_status' => 'paid', 'status' => 'placed']);
                     $order->payment()->update(['status' => 'completed', 'transaction_id' => $pi->id]);
                 }
                 break;

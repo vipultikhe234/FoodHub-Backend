@@ -11,8 +11,9 @@ use App\Models\Product;
 use App\Models\Review;
 use App\Http\Resources\ReviewResource;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
@@ -21,11 +22,65 @@ class ProductController extends Controller
         protected FCMService $fcmService
     ) {}
 
+    /**
+     * Lookup product by Barcode (Open Food Facts API Proxy)
+     */
+    public function lookupBarcode($barcode)
+    {
+        try {
+            $response = Http::get("https://world.openfoodfacts.org/api/v0/product/{$barcode}.json");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (isset($data['status']) && $data['status'] === 1) {
+                    $prod = $data['product'];
+                    return response()->json([
+                        'status' => 'success',
+                        'data' => [
+                            'name' => $prod['product_name'] ?? ($prod['product_name_en'] ?? 'Unknown Product'),
+                            'image' => $prod['image_url'] ?? ($prod['image_front_url'] ?? null),
+                            'brand' => $prod['brands'] ?? null,
+                            'category_guess' => $prod['categories_tags'][0] ?? null,
+                            'barcode' => $barcode
+                        ]
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Product not found in global database'
+            ], 404);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'API Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function index(Request $request)
     {
-        $role = $request->user('sanctum')?->role ?? 'guest';
-        $targetId = $request->query('merchant_id');
+        $user = $request->user('sanctum');
+        $role = $user?->role ?? 'guest';
+        
+        // STRICT LOCK: If users are merchants, they MUST only see their own data
+        // They cannot override this with the merchant_id query param.
+        $isMerchant = in_array(strtolower($role), ['merchant']);
+        $targetId = $isMerchant ? $user->merchant?->id : $request->query('merchant_id');
+        
         $cityId = $request->query('city_id');
+
+        // Bypassing city lockdown for Management Console (Admins & Merchants)
+        // They should see their whole inventory regardless of geography.
+        if ($user && in_array(strtolower($role), ['merchant', 'admin', 'super_admin'])) {
+            $cityId = null;
+        }
+
+        if ($isMerchant && !$targetId) {
+             return ProductResource::collection(collect([]));
+        }
 
         // Multidimensional Cache Key
         $cacheKey = "products_r_" . ($targetId ?? 'all') . "_city_" . ($cityId ?? 'all') . "_role_" . $role;
@@ -53,32 +108,37 @@ class ProductController extends Controller
         return new ProductResource($product);
     }
 
-    private function clearProductCache($MerchantId = null, $productId = null)
+    private function clearProductCache($merchantId = null, $productId = null)
     {
         $roles = ['guest', 'merchant', 'admin', 'super_admin', 'Admin', 'Super Admin'];
-        foreach ($roles as $role) {
-            if ($MerchantId) {
-                Cache::forget("products_r_{$MerchantId}_role_{$role}");
+        
+        $targets = ['all'];
+        if ($merchantId) $targets[] = (string)$merchantId;
+
+        foreach ($targets as $target) {
+            foreach ($roles as $role) {
+                Cache::forget("products_r_{$target}_role_{$role}");
+                // Clear city-specific variations if any
+                Cache::forget("products_r_{$target}_city_all_role_{$role}");
             }
-            Cache::forget("products_r_all_role_{$role}");
-            Cache::forget("products_r__role_{$role}"); // Catch null case
         }
         
-        Cache::forget('products_all');
         if ($productId) {
             Cache::forget("product_{$productId}");
         }
+        Cache::forget('products_all');
+        Cache::forget('products_active');
     }
 
     public function store(ProductRequest $request)
     {
         $data = $request->validated();
 
-        // Ownership Assignment
-        if ($request->user()->role === 'merchant') {
+        // Ownership Assignment - Strictly enforced
+        if (in_array(strtolower($request->user()->role), ['merchant'])) {
             $data['merchant_id'] = $request->user()->merchant?->id;
-            if (!$data['merchant_id']) return response()->json(['message' => 'No Merchant found'], 400);
-        } elseif (in_array($request->user()->role, ['admin', 'super_admin', 'Admin', 'Super Admin']) && $request->has('merchant_id')) {
+            if (!$data['merchant_id']) return response()->json(['message' => 'Linked Merchant Profile not found'], 400);
+        } elseif ($request->has('merchant_id')) {
             $data['merchant_id'] = $request->merchant_id;
         }
 

@@ -9,9 +9,12 @@ class ProductRepository
 {
     public function getAll($merchantId = null, $cityId = null): Collection
     {
-        $query = Product::byMerchant($merchantId)
-            ->active()
-            ->with(['category', 'merchant.merchantCategory', 'variants.inventories'])
+        // RELAXED FILTER: Show ALL products for the merchant, even those in 'draft' categories
+        $query = Product::query()
+            ->when($merchantId, function($q) use ($merchantId) {
+                $q->where('merchant_id', $merchantId);
+            })
+            ->with(['category', 'merchant.merchantCategory', 'merchant.other_charges', 'variants.inventories'])
             ->latest();
 
         if ($cityId) {
@@ -25,7 +28,7 @@ class ProductRepository
 
     public function findById(int $id): ?Product
     {
-        return Product::with(['category', 'merchant.merchantCategory', 'reviews.user', 'variants.inventories'])
+        return Product::with(['category', 'merchant.merchantCategory', 'merchant.other_charges', 'reviews.user', 'variants.inventories'])
             ->find($id);
     }
 
@@ -58,7 +61,7 @@ class ProductRepository
             ->whereColumn('discount_price', '<', 'price')
             ->selectRaw('*, (price - discount_price) as discount_value')
             ->orderBy('discount_value', 'desc')
-            ->with(['category', 'merchant.merchantCategory', 'variants.inventories', 'reviews'])
+            ->with(['category', 'merchant.merchantCategory', 'merchant.other_charges', 'variants.inventories', 'reviews'])
             ->limit(10);
 
         if ($cityId) {
@@ -76,7 +79,7 @@ class ProductRepository
             ->selectRaw('products.*, SUM(COALESCE(order_items.quantity, 0)) as sales_volume')
             ->groupBy('products.id')
             ->orderBy('sales_volume', 'desc')
-            ->with(['category', 'merchant.merchantCategory', 'variants.inventories', 'reviews'])
+            ->with(['category', 'merchant.merchantCategory', 'merchant.other_charges', 'variants.inventories', 'reviews'])
             ->limit(10);
 
         if ($cityId) {
@@ -95,7 +98,7 @@ class ProductRepository
         if ($merged->count() < 5) {
             $latestQuery = Product::active()
                 ->where('is_available', true)
-                ->with(['category', 'merchant.merchantCategory', 'variants.inventories', 'reviews'])
+                ->with(['category', 'merchant.merchantCategory', 'merchant.other_charges', 'variants.inventories', 'reviews'])
                 ->latest()
                 ->limit(10);
             
