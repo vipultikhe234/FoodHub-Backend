@@ -186,27 +186,39 @@ class OrderService
 
         $order = $this->repository->updateStatus($id, $status);
         if ($order) {
-            $order->load(['user']); // Ensure user info is loaded for notification
-            // Notify user of status change
-            if ($order->user && $order->user->fcm_token) {
-                $statusMsg = match($status) {
-                    \App\Models\Order::STATUS_ACCEPTED  => 'Your order has been accepted by the shop! ✅',
-                    \App\Models\Order::STATUS_PREPARING => 'Your order is being prepared! 🧑‍🍳',
-                    \App\Models\Order::STATUS_READY     => $order->order_type === \App\Models\Order::TYPE_PICKUP ? 'Your order is ready for pickup! 🎁' : 'Your order is ready to be picked up by a rider! 📦',
-                    \App\Models\Order::STATUS_OUT_FOR_DELIVERY => 'Your order is on the way! 🛵💨',
-                    \App\Models\Order::STATUS_DELIVERED  => 'Your order has been delivered! Enjoy! 🍽️',
-                    \App\Models\Order::STATUS_PICKED_UP   => 'You have successfully picked up your order! Enjoy! 🛍️',
-                    \App\Models\Order::STATUS_CANCELLED  => 'Your order has been cancelled.',
-                    default      => 'Your order status has been updated to: ' . ucfirst($status)
-                };
+            $order->load(['user', 'merchant.merchantCategory']); // Load category context
+            
+            // Notify user of status change (Safe & Context-Aware)
+            try {
+                if ($order->user && $order->user->fcm_token) {
+                    $category = strtolower($order->merchant->merchantCategory->name ?? 'general');
+                    $isFood = str_contains($category, 'food') || str_contains($category, 'restaura');
+                    
+                    $statusMsg = match($status) {
+                        \App\Models\Order::STATUS_ACCEPTED  => 'Your order has been accepted! ✅',
+                        \App\Models\Order::STATUS_PREPARING => $isFood ? 'The chef is preparing your meal... 🧑‍🍳' : 'Your items are being packed for delivery... 📦',
+                        \App\Models\Order::STATUS_READY     => $order->order_type === \App\Models\Order::TYPE_PICKUP ? 'Ready for Pickup! 🎁' : 'The parcel is ready for the rider! 📦',
+                        \App\Models\Order::STATUS_OUT_FOR_DELIVERY => 'Your order is out for delivery! 🛵💨',
+                        \App\Models\Order::STATUS_DELIVERED  => 'Delivered! We hope you love your order! ✨',
+                        \App\Models\Order::STATUS_PICKED_UP   => 'Picked up successfully! Have a great day! 🛍️',
+                        \App\Models\Order::STATUS_CANCELLED  => 'The order has been cancelled.',
+                        default      => 'Your order status has been updated to: ' . ucfirst($status)
+                    };
 
-                $this->fcmService->sendNotification(
-                    $order->user->fcm_token,
-                    'Order Update',
-                    $statusMsg,
-                    ['type' => 'order', 'id' => (string)$order->id, 'status' => $status],
-                    $order->user_id
-                );
+                    $this->fcmService->sendNotification(
+                        $order->user->fcm_token,
+                        'Order Status: ' . ucfirst($status),
+                        $statusMsg,
+                        [
+                            'type' => 'order_status', 
+                            'order_id' => (string)$order->id, 
+                            'status' => $status
+                        ],
+                        $order->user_id
+                    );
+                }
+            } catch (\Exception $e) {
+                \Log::warning("Notification failed for status update #{$order->id}: " . $e->getMessage());
             }
 
             return $order;

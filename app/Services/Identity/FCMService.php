@@ -51,26 +51,40 @@ class FCMService
         if (!$accessToken) return false;
 
         try {
-            $response = Http::withToken($accessToken)
-                ->post("https://fcm.googleapis.com/v1/projects/{$this->projectId}/messages:send", [
-                    'message' => [
-                        'token' => $token,
+            $payload = [
+                'message' => [
+                    'token' => $token,
+                    'notification' => [
+                        'title' => $title,
+                        'body' => $body,
+                        'image' => 'https://apnacart-backend-2alg.onrender.com/assets/logo.png',
+                    ],
+                    'data' => count($data) > 0 ? array_map('strval', $data) : (object)[],
+                    'android' => [
+                        'priority' => 'high',
                         'notification' => [
-                            'title' => $title,
-                            'body' => $body,
-                        ],
-                        'data' => count($data) > 0 ? array_map('strval', $data) : (object)[],
-                        'android' => [
-                            'priority' => 'high',
-                            'notification' => [
-                                'sound' => 'default',
-                                'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
-                            ],
+                            'sound' => 'default',
+                            'icon' => 'notification_icon',
+                            'color' => '#ff4c1a',
+                            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                            'channel_id' => 'fcm_default_channel',
                         ],
                     ],
-                ]);
+                ],
+            ];
+
+            $response = Http::withToken($accessToken)
+                ->post("https://fcm.googleapis.com/v1/projects/{$this->projectId}/messages:send", $payload);
 
             $success = $response->successful();
+            
+            if (!$success) {
+                Log::error('FCM V1 Error', [
+                    'user_id' => $userId,
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+            }
 
             if ($userId) {
                 \App\Models\NotificationHistory::create([
@@ -83,20 +97,12 @@ class FCMService
                 ]);
             }
 
-            if ($success) {
-                Log::info('FCM V1: Notification sent successfully.', ['token' => $token]);
-                return true;
-            }
-
-            Log::error('FCM V1: Notification failed.', [
-                'token' => $token,
-                'status' => $response->status(),
-                'response' => $response->body()
-            ]);
-
-            return false;
+            return $success;
         } catch (\Exception $e) {
-            Log::error('FCM V1: Exception during send.', ['error' => $e->getMessage()]);
+            Log::error('FCM V1 Exception', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
             return false;
         }
     }

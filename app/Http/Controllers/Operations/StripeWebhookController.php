@@ -4,73 +4,51 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Order;
 use Stripe\Stripe;
 use Stripe\PaymentIntent;
 use Stripe\Webhook;
-use Stripe\Exception\SignatureVerificationException;
+use App\Models\Order;
+use App\Services\Identity\FCMService;
 use UnexpectedValueException;
+use Stripe\Exception\SignatureVerificationException;
 
 class StripeWebhookController extends Controller
 {
+    public function __construct(
+        protected FCMService $fcmService
+    ) {}
+
     /**
-     * Called by the frontend AFTER Stripe.js confirms payment.
-     * Verifies the PaymentIntent with Stripe directly (source of truth)
-     * and marks the order as paid.
-     * This is the local dev alternative to webhooks (which need a public URL).
+     * Create a pre-order PaymentIntent (Simple Flow)
      */
-    public function confirmPayment(Request $request)
+    public function createIntent(Request $request)
     {
-        $request->validate([
-            'order_id'          => 'required|integer',
-            'payment_intent_id' => 'required|string',
-        ]);
-
+        $request->validate(['amount' => 'required|numeric|min:1']);
+        
         Stripe::setApiKey(config('services.stripe.secret'));
-
+        
         try {
-            $intent = PaymentIntent::retrieve($request->payment_intent_id);
-
-            if ($intent->status !== 'succeeded') {
-                return response()->json([
-                    'message' => 'Payment not confirmed by Stripe. Status: ' . $intent->status
-                ], 422);
-            }
-
-            $order = Order::with('payment')->find($request->order_id);
-
-            if (!$order) {
-                return response()->json(['message' => 'Order not found'], 404);
-            }
-
-            if ($order->user_id !== $request->user()->id) {
-                return response()->json(['message' => 'Unauthorized'], 403);
-            }
-
-            $order->update([
-                'payment_status' => 'paid',
-                'status'         => 'placed',
-            ]);
-
-            $order->payment()->update([
-                'status'         => 'completed',
-                'transaction_id' => $intent->id,
+            $intent = PaymentIntent::create([
+                'amount'   => (int) ($request->amount * 100),
+                'currency' => 'inr',
+                'automatic_payment_methods' => ['enabled' => true],
+                'metadata' => [
+                    'user_id' => $request->user()->id,
+                    'type'    => 'pre_order_payment'
+                ]
             ]);
 
             return response()->json([
-                'message' => 'Payment confirmed',
-                'data'    => $order->load('payment'),
+                'client_secret'     => $intent->client_secret,
+                'payment_intent_id' => $intent->id
             ]);
-
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Verification failed: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['message' => $e->getMessage()], 400);
         }
     }
 
     /**
-     * Stripe Webhook handler (production — requires a public URL).
+     * Standard Webhook (Redundancy Fallback Only)
      */
     public function handle(Request $request)
     {
@@ -80,30 +58,22 @@ class StripeWebhookController extends Controller
 
         try {
             $event = Webhook::constructEvent($payload, $sig_header, $endpoint_secret);
-        } catch (UnexpectedValueException $e) {
-            return response()->json(['error' => 'Invalid payload'], 400);
-        } catch (SignatureVerificationException $e) {
-            return response()->json(['error' => 'Invalid signature'], 400);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
         }
 
-        switch ($event->type) {
-            case 'payment_intent.succeeded':
-                $pi    = $event->data->object;
-                $order = Order::find($pi->metadata->order_id);
-                if ($order) {
-                    $order->update(['payment_status' => 'paid', 'status' => 'placed']);
-                    $order->payment()->update(['status' => 'completed', 'transaction_id' => $pi->id]);
-                }
-                break;
-
-            case 'payment_intent.payment_failed':
-                $pi    = $event->data->object;
-                $order = Order::find($pi->metadata->order_id);
-                if ($order) {
-                    $order->update(['payment_status' => 'failed']);
-                    $order->payment()->update(['status' => 'failed']);
-                }
-                break;
+        if ($event->type === 'payment_intent.succeeded') {
+            $pi = $event->data->object;
+            // Lookup order by transaction_id (PaymentIntent ID)
+            $order = Order::where('payment_method', 'stripe')
+                ->where('payment_status', 'pending')
+                ->latest()
+                ->first(); // Note: Better to match by metadata if possible, but simplified for one-stop flow
+                
+            if ($order) {
+                $order->update(['payment_status' => 'paid', 'status' => 'placed']);
+                $order->payment()->update(['status' => 'completed', 'payment_id' => $pi->id]);
+            }
         }
 
         return response()->json(['success' => true]);

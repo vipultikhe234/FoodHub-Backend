@@ -14,9 +14,10 @@ class Order extends Model
     const STATUS_PLACED = 'placed';
     const STATUS_ACCEPTED = 'accepted';
     const STATUS_PREPARING = 'preparing';
-    const STATUS_READY_FOR_PICKUP = 'ready_for_pickup';
+    const STATUS_READY = 'ready';
     const STATUS_OUT_FOR_DELIVERY = 'out_for_delivery';
     const STATUS_DELIVERED = 'delivered';
+    const STATUS_PICKED_UP = 'picked_up';
     const STATUS_CANCELLED = 'cancelled';
     const STATUS_FAILED = 'failed';
 

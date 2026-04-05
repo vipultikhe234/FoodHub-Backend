@@ -89,7 +89,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders', [OrderController::class, 'store']);
     Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::patch('/orders/{id}/payment-status', [OrderController::class, 'updatePaymentStatus']);
-    Route::post('/payments/confirm', [StripeWebhookController::class, 'confirmPayment']);
+    Route::post('/payments/create-intent', [StripeWebhookController::class, 'createIntent']);
 
     Route::get('/coupons', [CouponController::class, 'index']);
     Route::post('/coupons', [CouponController::class, 'store']);
