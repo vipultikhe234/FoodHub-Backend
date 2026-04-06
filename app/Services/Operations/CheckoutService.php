@@ -17,7 +17,8 @@ class CheckoutService
 {
     public function __construct(
         protected \App\Services\Identity\FCMService $fcmService
-    ) {}
+    ) {
+    }
 
     /**
      * Complete the checkout process in a single atomic transaction.
@@ -30,7 +31,7 @@ class CheckoutService
             if (empty($data['payment_intent_id'])) {
                 throw new \Exception("Stripe Payment Intent ID is required for card orders.");
             }
-            
+
             \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
             try {
                 $intent = \Stripe\PaymentIntent::retrieve($data['payment_intent_id']);
@@ -46,28 +47,42 @@ class CheckoutService
             // 1. Resolve Global Entities
             $Merchant = Merchant::with('user')->findOrFail($data['merchant_id']);
             $address = UserAddress::find($data['address_id'] ?? null);
-            
+
             // 2. Initial Calculations
             $subtotal = 0;
-            
+
             // 3. Process Items & Resolve Stock
             foreach ($data['items'] as $item) {
                 $itemSubtotal = $item['unit_price'] * $item['quantity'];
                 $subtotal += $itemSubtotal;
 
                 // Resolve Stock Context
-                $inventory = Inventory::where('product_variant_id', $item['product_variant_id'] ?? null)
-                    ->where('merchant_id', $Merchant->id)
-                    ->lockForUpdate()
-                    ->first();
+                $inventory = null;
+                if (!empty($item['product_variant_id'])) {
+                    $inventory = Inventory::where('product_variant_id', $item['product_variant_id'])
+                        ->where('merchant_id', $Merchant->id)
+                        ->lockForUpdate()
+                        ->first();
+                }
 
+                // SECURITY GUARD: If product requires variants but none was given, it hits 'else' branch naturally.
                 if ($inventory) {
                     if (($inventory->stock - $inventory->reserved_stock) < $item['quantity']) {
-                        throw new \Exception("Item '{$item['product_name']}' is out of stock.");
+                        throw new \Exception("Item '{$item['product_name']}' ({$item['variant_name']}) is out of stock.");
                     }
                     $inventory->increment('reserved_stock', $item['quantity']);
                 } else {
+                    // Fail-early for variants that are missing inventory records
+                    if (!empty($item['product_variant_id'])) {
+                        throw new \Exception("Selection '{$item['variant_name']}' for '{$item['product_name']}' is currently unavailable.");
+                    }
+
                     $product = \App\Models\Product::find($item['product_id']);
+                    // If product itself has variants but we reached here without a variant, reject
+                    if ($product && $product->has_variants) {
+                        throw new \Exception("Item '{$item['product_name']}' require a specific selection.");
+                    }
+
                     if (!$product || $product->stock < $item['quantity']) {
                         throw new \Exception("Item '{$item['product_name']}' is out of stock.");
                     }
@@ -82,42 +97,51 @@ class CheckoutService
             $taxAmount = $data['tax_amount'] ?? ($subtotal * 0.05);
             $totalAmount = ($subtotal + $deliveryFee + $packingCharge + $platformFee + $taxAmount) - ($data['coupon_discount'] ?? 0);
 
-            // Generate Order Number
-            $orderNumber = strtoupper(Str::random(3)) . rand(1000000, 9999999);
+            // Generate Order Number: 3 Letters (A-Z only) + 7 random digits
+            $letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            $prefix = substr(str_shuffle($letters), 0, 3);
+            $orderNumber = $prefix . rand(1000000, 9999999);
 
             // 5. Create Order Header
             $isStripe = ($data['payment_method'] ?? 'COD') === 'stripe';
-            
+
+            // Resolve Coupon ID for tracking
+            $couponId = null;
+            if (!empty($data['coupon_code'])) {
+                $couponId = Coupon::where('code', $data['coupon_code'])->value('id');
+            }
+
             $order = Order::create([
-                'order_number'     => $orderNumber,
-                'idempotency_key'  => $data['idempotency_key'] ?? null,
-                'user_id'          => $user->id,
-                'merchant_id'      => $Merchant->id,
-                'subtotal'         => $subtotal,
-                'tax_amount'       => $taxAmount,
-                'delivery_fee'     => $deliveryFee,
-                'packaging_fee'    => $packingCharge,
-                'platform_fee'     => $platformFee,
-                'coupon_discount'  => $data['coupon_discount'] ?? 0,
-                'coupon_code'      => $data['coupon_code'] ?? null,
-                'total_price'      => $totalAmount,
-                'address_id'       => $address?->id,
-                'payment_method'   => $data['payment_method'] ?? 'COD',
-                'payment_status'   => $isStripe ? 'paid' : 'pending',
-                'status'           => 'placed',
-                'order_type'       => $data['order_type'] ?? 'delivery',
-                'notes'            => $data['notes'] ?? null,
+                'order_number' => $orderNumber,
+                'idempotency_key' => $data['idempotency_key'] ?? null,
+                'user_id' => $user->id,
+                'merchant_id' => $Merchant->id,
+                'subtotal' => $subtotal,
+                'tax_amount' => $taxAmount,
+                'delivery_fee' => $deliveryFee,
+                'packaging_fee' => $packingCharge,
+                'platform_fee' => $platformFee,
+                'coupon_id' => $couponId,
+                'coupon_discount' => $data['coupon_discount'] ?? 0,
+                'coupon_code' => $data['coupon_code'] ?? null,
+                'total_price' => $totalAmount,
+                'address_id' => $address?->id,
+                'payment_method' => $data['payment_method'] ?? 'COD',
+                'payment_status' => $isStripe ? 'paid' : 'pending',
+                'status' => 'placed',
+                'order_type' => $data['order_type'] ?? 'delivery',
+                'notes' => $data['notes'] ?? null,
             ]);
 
             // 6. Create Items
             foreach ($data['items'] as $item) {
                 OrderItem::create([
-                    'order_id'           => $order->id,
-                    'product_id'        => $item['product_id'],
-                    'product_variant_id'=> $item['product_variant_id'],
-                    'quantity'          => $item['quantity'],
-                    'price'             => $item['unit_price'],
-                    'total'             => $item['unit_price'] * $item['quantity'],
+                    'order_id' => $order->id,
+                    'product_id' => $item['product_id'],
+                    'product_variant_id' => $item['product_variant_id'] ?? null,
+                    'quantity' => $item['quantity'],
+                    'price' => $item['unit_price'],
+                    'total' => $item['unit_price'] * $item['quantity'],
                 ]);
             }
 
@@ -125,9 +149,9 @@ class CheckoutService
             if ($isStripe) {
                 $order->payment()->create([
                     'payment_method' => 'stripe',
-                    'amount'         => $totalAmount,
-                    'status'         => 'completed',
-                    'payment_id'     => $data['payment_intent_id'] ?? null,
+                    'amount' => $totalAmount,
+                    'status' => 'completed',
+                    'payment_id' => $data['payment_intent_id'] ?? null,
                 ]);
             }
 
@@ -139,7 +163,7 @@ class CheckoutService
                         $Merchant->user->fcm_token,
                         '🚀 New Order!',
                         "New order #{$order->order_number} received from {$user->name}",
-                        ['type' => 'new_order', 'order_id' => (string)$order->id],
+                        ['type' => 'new_order', 'order_id' => (string) $order->id],
                         $Merchant->user->id
                     );
                 }
@@ -150,7 +174,7 @@ class CheckoutService
                         $user->fcm_token,
                         '📦 Order Placed!',
                         "Your order #{$order->order_number} has been placed successfully.",
-                        ['type' => 'order_status', 'order_id' => (string)$order->id, 'status' => 'placed'],
+                        ['type' => 'order_status', 'order_id' => (string) $order->id, 'status' => 'placed'],
                         $user->id
                     );
                 }

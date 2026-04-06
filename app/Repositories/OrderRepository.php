@@ -11,19 +11,19 @@ class OrderRepository
     public function getAll($MerchantId = null)
     {
         return Order::byMerchant($MerchantId)
-            ->with(['user', 'merchant.merchantCategory', 'rider', 'items.product', 'payment', 'coupon'])
+            ->with(['user', 'merchant.merchantCategory', 'rider', 'items.product', 'items.variant', 'payment', 'coupon'])
             ->latest()
             ->get();
     }
 
     public function findById($id)
     {
-        return Order::with(['user', 'merchant.merchantCategory', 'rider', 'items.product', 'payment', 'coupon'])->find($id);
+        return Order::with(['user', 'merchant.merchantCategory', 'rider', 'items.product', 'items.variant', 'payment', 'coupon'])->find($id);
     }
 
     public function getUserOrders($userId)
     {
-        return Order::with(['merchant.merchantCategory', 'items.product', 'coupon'])->where('user_id', $userId)->latest()->get();
+        return Order::with(['merchant.merchantCategory', 'items.product', 'items.variant', 'coupon'])->where('user_id', $userId)->latest()->get();
     }
 
     public function create(array $data, array $items)

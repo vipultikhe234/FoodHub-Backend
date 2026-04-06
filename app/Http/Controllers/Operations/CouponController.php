@@ -49,6 +49,9 @@ class CouponController extends Controller
         $discount = 0;
         if ($coupon->type === 'percentage') {
             $discount = ($request->order_amount * $coupon->value) / 100;
+            if ($coupon->max_discount > 0 && $discount > $coupon->max_discount) {
+                $discount = $coupon->max_discount;
+            }
         } else {
             $discount = $coupon->value;
         }
@@ -56,7 +59,8 @@ class CouponController extends Controller
         return response()->json([
             'message' => 'Coupon applied!',
             'discount' => round($discount, 2),
-            'code' => $coupon->code
+            'code' => $coupon->code,
+            'coupon' => $coupon
         ]);
     }
 
@@ -77,6 +81,7 @@ class CouponController extends Controller
             'type' => 'required|in:fixed,percentage',
             'value' => 'required|numeric',
             'min_order_amount' => 'required|numeric',
+            'max_discount' => 'nullable|numeric',
             'expires_at' => 'required|date',
             'is_active' => 'boolean',
             'merchant_id' => 'nullable|exists:merchants,id'
@@ -108,6 +113,7 @@ class CouponController extends Controller
             'type' => 'sometimes|in:fixed,percentage',
             'value' => 'sometimes|numeric',
             'min_order_amount' => 'sometimes|numeric',
+            'max_discount' => 'nullable|numeric',
             'expires_at' => 'sometimes|date',
             'is_active' => 'boolean',
             'merchant_id' => 'nullable|exists:merchants,id'

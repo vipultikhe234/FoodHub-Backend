@@ -63,18 +63,18 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $user = $request->user('sanctum');
-        $role = $user?->role ?? 'guest';
+        $role = strtolower($user?->role ?? 'guest');
         
         // STRICT LOCK: If users are merchants, they MUST only see their own data
         // They cannot override this with the merchant_id query param.
-        $isMerchant = in_array(strtolower($role), ['merchant']);
+        $isMerchant = ($role === 'merchant');
         $targetId = $isMerchant ? $user->merchant?->id : $request->query('merchant_id');
         
         $cityId = $request->query('city_id');
 
         // Bypassing city lockdown for Management Console (Admins & Merchants)
         // They should see their whole inventory regardless of geography.
-        if ($user && in_array(strtolower($role), ['merchant', 'admin', 'super_admin'])) {
+        if ($user && in_array($role, ['merchant', 'admin', 'super_admin'])) {
             $cityId = null;
         }
 
@@ -110,22 +110,24 @@ class ProductController extends Controller
 
     private function clearProductCache($merchantId = null, $productId = null)
     {
-        $roles = ['guest', 'merchant', 'admin', 'super_admin', 'Admin', 'Super Admin'];
+        $roles = ['guest', 'user', 'customer', 'merchant', 'admin', 'super_admin', 'Admin', 'Super Admin'];
+        $cities = ['all']; // City ID as string or 'all'
         
         $targets = ['all'];
         if ($merchantId) $targets[] = (string)$merchantId;
 
+        // Clear every possible combination of cached product lists
         foreach ($targets as $target) {
-            foreach ($roles as $role) {
-                Cache::forget("products_r_{$target}_role_{$role}");
-                // Clear city-specific variations if any
-                Cache::forget("products_r_{$target}_city_all_role_{$role}");
+            foreach ($cities as $city) {
+                foreach ($roles as $role) {
+                    Cache::forget("products_r_{$target}_city_{$city}_role_{$role}");
+                    Cache::forget("products_r_{$target}_role_{$role}");
+                }
             }
         }
         
-        if ($productId) {
-            Cache::forget("product_{$productId}");
-        }
+        if ($productId) Cache::forget("product_{$productId}");
+        
         Cache::forget('products_all');
         Cache::forget('products_active');
     }

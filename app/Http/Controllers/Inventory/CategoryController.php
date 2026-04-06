@@ -43,7 +43,7 @@ class CategoryController extends Controller
 
     private function clearCategoryCache($MerchantId = null)
     {
-        $roles = ['guest', 'merchant', 'admin', 'super_admin', 'Admin', 'Super Admin'];
+        $roles = ['guest', 'user', 'customer', 'merchant', 'admin', 'super_admin', 'Admin', 'Super Admin'];
         foreach ($roles as $role) {
             if ($MerchantId) {
                 Cache::forget("categories_r_{$MerchantId}_role_{$role}");

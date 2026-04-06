@@ -32,7 +32,7 @@ class OrderController extends Controller
                 return response()->json([
                     'message' => 'Order placed. Finalizing payment...',
                     'data'    => [
-                        'order' => $order->load(['items', 'payment']),
+                        'order' => $order->load(['items.product', 'items.variant', 'payment']),
                         'stripe_client_secret' => $intent['client_secret']
                     ]
                 ], 201);
@@ -41,7 +41,7 @@ class OrderController extends Controller
             return response()->json([
                 'message' => 'Order placed successfully',
                 'data'    => [
-                    'order' => $order->load(['items', 'payment'])
+                    'order' => $order->load(['items.product', 'items.variant', 'payment'])
                 ]
             ], 201);
         } catch (\Exception $e) {
@@ -56,7 +56,7 @@ class OrderController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $order = Order::with(['items.product', 'user', 'payment', 'merchant'])->find($id);
+        $order = Order::with(['items.product', 'items.variant', 'user', 'payment', 'merchant'])->find($id);
 
         if (!$order) {
             return response()->json(['message' => 'Order not found'], 404);

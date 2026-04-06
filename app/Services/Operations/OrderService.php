@@ -121,7 +121,8 @@ class OrderService
                 'user_lat'       => $data['latitude'] ?? null,
                 'user_lng'       => $data['longitude'] ?? null,
                 'distance_km'    => $distance ?? 0,
-                'discount'       => $discount,
+                'discount'       => $discount, // Snapshot for potential legacy consumers
+                'coupon_discount'=> $discount, // DB Column Match
                 'coupon_id'      => $couponId,
                 'order_type'     => $data['order_type'] ?? \App\Models\Order::TYPE_DELIVERY,
                 'estimated_delivery_time' => now()->addMinutes(30),

@@ -9,9 +9,9 @@ class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $v = $this->whenLoaded('variants');
-        $startingPrice = $this->has_variants && $v && count($v) > 0
-            ? (float) collect($v)->min('price')
+        $variants = $this->relationLoaded('variants') ? $this->variants : null;
+        $startingPrice = ($this->has_variants && $variants && $variants->count() > 0)
+            ? (float) $variants->min('price')
             : (float) $this->price;
 
         $discountPercentage = 0;
@@ -44,8 +44,8 @@ class ProductResource extends JsonResource
             'merchant' => new MerchantResource($this->whenLoaded('merchant')),
             'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
-            'avg_rating' => (float) ($this->reviews->avg('rating') ?? 4.5), 
-            'review_count' => $this->reviews->count(),
+            'avg_rating' => (float) ($this->relationLoaded('reviews') ? ($this->reviews->avg('rating') ?? 4.5) : 4.5), 
+            'review_count' => $this->relationLoaded('reviews') ? $this->reviews->count() : 0,
             'created_at' => $this->created_at,
         ];
     }

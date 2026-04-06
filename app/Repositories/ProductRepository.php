@@ -34,7 +34,29 @@ class ProductRepository
 
     public function create(array $data): Product
     {
-        return Product::create($data);
+        return \Illuminate\Support\Facades\DB::transaction(function() use ($data) {
+            $product = Product::create($data);
+            
+            if (!empty($data['variants']) && is_array($data['variants'])) {
+                foreach ($data['variants'] as $vData) {
+                    $variant = $product->variants()->create($vData);
+                    
+                    // Sync with Inventory for the owner Merchant
+                    \App\Models\Inventory::create([
+                        'product_variant_id' => $variant->id,
+                        'merchant_id'        => $product->merchant_id,
+                        'stock'               => $vData['stock'] ?? 0,
+                        'reserved_stock'      => 0,
+                        'is_available'        => true
+                    ]);
+                }
+                
+                // Update product total stock summary for global listings
+                $totalStock = collect($data['variants'])->sum('stock');
+                $product->update(['stock' => $totalStock]);
+            }
+            return $product;
+        });
     }
 
     public function update(int $id, array $data): bool
@@ -43,7 +65,52 @@ class ProductRepository
         if (!$product) {
             return false;
         }
-        return $product->update($data);
+
+        return \Illuminate\Support\Facades\DB::transaction(function() use ($product, $data) {
+            $product->update($data);
+
+            if (isset($data['variants']) && is_array($data['variants'])) {
+                $newVariantIds = [];
+                foreach ($data['variants'] as $vData) {
+                    $variant = null;
+                    if (isset($vData['id'])) {
+                        $variant = \App\Models\ProductVariant::find($vData['id']);
+                        if ($variant) {
+                            $variant->update($vData);
+                        }
+                    }
+                    
+                    if (!$variant) {
+                        $variant = $product->variants()->create($vData);
+                    }
+
+                    $newVariantIds[] = $variant->id;
+
+                    // Sync Inventory for the merchant
+                    \App\Models\Inventory::updateOrCreate(
+                        [
+                            'product_variant_id' => $variant->id, 
+                            'merchant_id' => $product->merchant_id
+                        ],
+                        [
+                            'stock' => $vData['stock'] ?? 0,
+                            'is_available' => true
+                        ]
+                    );
+                }
+
+                // Cleanup variants removed in frontend
+                $product->variants()->whereNotIn('id', $newVariantIds)->delete();
+
+                // Update product total stock summary
+                $totalStock = \App\Models\Inventory::whereIn('product_variant_id', $newVariantIds)
+                    ->where('merchant_id', $product->merchant_id)
+                    ->sum('stock');
+                $product->update(['stock' => $totalStock]);
+            }
+
+            return true;
+        });
     }
 
     public function delete(int $id): bool
