@@ -22,7 +22,7 @@ class StoreOrderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'merchant_id'      => 'required|exists:Merchants,id',
+            'merchant_id'      => 'required|exists:merchants,id',
             'idempotency_key'    => 'nullable|string|max:100',
             'address_id'         => 'nullable|exists:user_addresses,id',
             'delivery_address'   => 'required|string|max:500',

@@ -37,7 +37,7 @@ class LocationController extends Controller
         }
 
         if ($request->boolean('has_merchants')) {
-            $query->has('Merchants');
+            $query->has('merchants');
         }
 
         return response()->json($query->get());

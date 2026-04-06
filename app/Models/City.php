@@ -13,7 +13,7 @@ class City extends Model
         return $this->belongsTo(State::class);
     }
 
-    public function Merchants()
+    public function merchants()
     {
         return $this->hasMany(Merchant::class);
     }

@@ -22,7 +22,7 @@ class CouponController extends Controller
         $request->validate([
             'code' => 'required|string',
             'order_amount' => 'required|numeric',
-            'merchant_id' => 'nullable|exists:Merchants,id'
+            'merchant_id' => 'nullable|exists:merchants,id'
         ]);
 
         $query = Coupon::where('code', $request->code);
