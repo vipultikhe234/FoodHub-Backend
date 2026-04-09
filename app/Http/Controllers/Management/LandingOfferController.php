@@ -11,15 +11,21 @@ class LandingOfferController extends Controller
     /**
      * Display a listing of landing offers.
      */
-    public function index()
+    public function index(Request $request)
     {
         $now = now();
+        $cityId = $request->query('city_id');
         
         // Fetch all landing offers with merchant and their category relation
         $landingOffers = LandingOffer::with(['merchant.merchantCategory'])->get();
         
-        // Filter based on their source's current status
-        $activeLandingOffers = $landingOffers->filter(function($item) use ($now) {
+        // Filter based on city (if provided) and their source's current status
+        $activeLandingOffers = $landingOffers->filter(function($item) use ($now, $cityId) {
+            // City check first
+            if ($cityId && $item->merchant_id && $item->merchant?->city_id != $cityId) {
+                return false;
+            }
+
             if ($item->type === 'offer') {
                 $source = \App\Models\Offer::find($item->source_id);
                 if (!$source) return false;
