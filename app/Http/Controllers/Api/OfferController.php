@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Offer;
+use App\Models\LandingOffer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -62,6 +63,20 @@ class OfferController extends Controller
             $query->where('merchant_id', $request->merchant_id);
         }
 
+        if ($request->has('status') && $request->status !== 'all') {
+            $isActive = $request->status === 'active';
+            if ($isActive) {
+                $query->where('is_active', true)
+                      ->where(function($q) {
+                          $q->whereNull('end_date')->orWhere('end_date', '>=', now()->startOfDay());
+                      });
+            } else {
+                $query->where(function($q) {
+                    $q->where('is_active', false)->orWhere('end_date', '<', now()->startOfDay());
+                });
+            }
+        }
+
         return response()->json([
             'data' => $query->orderBy('priority', 'desc')->orderBy('id', 'desc')->get()
         ]);
@@ -85,10 +100,24 @@ class OfferController extends Controller
             'end_date' => 'nullable|date',
             'priority' => 'nullable|integer',
             'is_active' => 'nullable|boolean',
+            'show_on_landing' => 'nullable|boolean',
         ]);
 
         $offer = Offer::create($data);
         Cache::forget('active_live_offers');
+
+        if ($offer->show_on_landing) {
+            LandingOffer::updateOrCreate(
+                ['type' => 'offer', 'source_id' => $offer->id],
+                [
+                    'title' => $offer->title,
+                    'subtitle' => $offer->description,
+                    'image' => $offer->banner_url,
+                    'link' => "/Merchant/{$offer->merchant_id}",
+                    'merchant_id' => $offer->merchant_id
+                ]
+            );
+        }
 
         return response()->json(['success' => true, 'data' => $offer]);
     }
@@ -112,10 +141,26 @@ class OfferController extends Controller
             'end_date' => 'nullable|date',
             'priority' => 'integer',
             'is_active' => 'boolean',
+            'show_on_landing' => 'nullable|boolean',
         ]);
 
         $offer->update($data);
         Cache::forget('active_live_offers');
+
+        if ($offer->show_on_landing) {
+            LandingOffer::updateOrCreate(
+                ['type' => 'offer', 'source_id' => $offer->id],
+                [
+                    'title' => $offer->title,
+                    'subtitle' => $offer->description,
+                    'image' => $offer->banner_url,
+                    'link' => "/Merchant/{$offer->merchant_id}",
+                    'merchant_id' => $offer->merchant_id
+                ]
+            );
+        } else {
+            LandingOffer::where('type', 'offer')->where('source_id', $offer->id)->delete();
+        }
 
         return response()->json(['success' => true, 'data' => $offer]);
     }

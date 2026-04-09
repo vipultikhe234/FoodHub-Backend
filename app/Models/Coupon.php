@@ -20,6 +20,7 @@ class Coupon extends Model
         'merchant_id',
         'is_active',
         'expires_at',
+        'show_on_landing',
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class Coupon extends Model
         'min_order_amount' => 'decimal:2',
         'max_discount' => 'decimal:2',
         'is_active' => 'boolean',
+        'show_on_landing' => 'boolean',
         'expires_at' => 'datetime',
     ];
 

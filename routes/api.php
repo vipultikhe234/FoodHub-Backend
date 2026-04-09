@@ -26,6 +26,7 @@ use App\Http\Controllers\Management\LocationController;
 use App\Http\Controllers\Management\MerchantCategoryController;
 use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\AIController;
+use App\Http\Controllers\Management\LandingOfferController;
 
 /*
 |--------------------------------------------------------------------------
@@ -50,6 +51,7 @@ Route::get('/cron/run', function () {
 // 0. Public Gateway (Non-Authenticated)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/landing-offers', [LandingOfferController::class, 'index']);
 Route::get('/products/curated', [ProductController::class, 'curated']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/barcode-lookup/{barcode}', [ProductController::class, 'lookupBarcode']);

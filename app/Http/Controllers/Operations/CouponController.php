@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
 use App\Models\Coupon;
+use App\Models\LandingOffer;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Services\Identity\FCMService;
@@ -67,7 +68,20 @@ class CouponController extends Controller
     public function index(Request $request)
     {
         $MerchantId = $request->query('merchant_id');
-        $coupons = Coupon::byMerchant($MerchantId)->with('merchant.merchantCategory')->latest()->get();
+        $query = Coupon::byMerchant($MerchantId)->with('merchant.merchantCategory');
+
+        if ($request->has('status') && $request->status !== 'all') {
+            $isActive = $request->status === 'active';
+            if ($isActive) {
+                $query->where('is_active', true)->where('expires_at', '>=', now());
+            } else {
+                $query->where(function($q) {
+                    $q->where('is_active', false)->orWhere('expires_at', '<', now());
+                });
+            }
+        }
+
+        $coupons = $query->latest()->get();
 
         return response()->json([
             'data' => $coupons
@@ -84,7 +98,8 @@ class CouponController extends Controller
             'max_discount' => 'nullable|numeric',
             'expires_at' => 'required|date',
             'is_active' => 'boolean',
-            'merchant_id' => 'nullable|exists:merchants,id'
+            'merchant_id' => 'nullable|exists:merchants,id',
+            'show_on_landing' => 'nullable|boolean',
         ]);
 
         if ($request->user()->role === 'merchant') {
@@ -93,6 +108,19 @@ class CouponController extends Controller
         }
 
         $coupon = Coupon::create($validated);
+
+        if ($coupon->show_on_landing) {
+            LandingOffer::updateOrCreate(
+                ['type' => 'coupon', 'source_id' => $coupon->id],
+                [
+                    'title' => ($coupon->type === 'percentage' ? "{$coupon->value}% OFF" : "₹{$coupon->value} FLAT") . " ON ORDERS",
+                    'subtitle' => "Use code: {$coupon->code} | Min Order ₹{$coupon->min_order_amount}",
+                    'image' => null, // Branding image fallback will be handled in frontend
+                    'link' => "/Merchant/{$coupon->merchant_id}",
+                    'merchant_id' => $coupon->merchant_id
+                ]
+            );
+        }
 
         // Broadcast refresh
         $this->fcmService->broadcastData(['type' => 'refresh_coupons', 'action' => 'created', 'code' => $coupon->code]);
@@ -116,10 +144,26 @@ class CouponController extends Controller
             'max_discount' => 'nullable|numeric',
             'expires_at' => 'sometimes|date',
             'is_active' => 'boolean',
-            'merchant_id' => 'nullable|exists:merchants,id'
+            'merchant_id' => 'nullable|exists:merchants,id',
+            'show_on_landing' => 'nullable|boolean',
         ]);
 
         $coupon->update($validated);
+
+        if ($coupon->show_on_landing) {
+            LandingOffer::updateOrCreate(
+                ['type' => 'coupon', 'source_id' => $coupon->id],
+                [
+                    'title' => ($coupon->type === 'percentage' ? "{$coupon->value}% OFF" : "₹{$coupon->value} FLAT") . " ON ORDERS",
+                    'subtitle' => "Use code: {$coupon->code} | Min Order ₹{$coupon->min_order_amount}",
+                    'image' => null, 
+                    'link' => "/Merchant/{$coupon->merchant_id}",
+                    'merchant_id' => $coupon->merchant_id
+                ]
+            );
+        } else {
+            LandingOffer::where('type', 'coupon')->where('source_id', $coupon->id)->delete();
+        }
 
         // Broadcast refresh
         $this->fcmService->broadcastData(['type' => 'refresh_coupons', 'action' => 'updated', 'id' => (string)$id]);

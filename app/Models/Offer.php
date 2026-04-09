@@ -27,7 +27,8 @@ class Offer extends Model
         'expires_at',
         'start_date',
         'end_date',
-        'is_active'
+        'is_active',
+        'show_on_landing'
     ];
 
     protected $casts = [
@@ -36,6 +37,7 @@ class Offer extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'is_active' => 'boolean',
+        'show_on_landing' => 'boolean',
         'value' => 'decimal:2',
         'discount_value' => 'decimal:2',
         'priority' => 'integer',
