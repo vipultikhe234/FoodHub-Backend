@@ -34,8 +34,8 @@ use App\Http\Controllers\Api\AIController;
 */
 
 Route::get('/ping', function () {
-    return response()->json(['status' => 'ok']); });
-
+    return response()->json(['status' => 'ok']);
+});
 // 0. Public Gateway (Non-Authenticated)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -138,7 +138,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/admin/merchant-categories/{id}', [MerchantCategoryController::class, 'update']);
         Route::delete('/admin/merchant-categories/{id}', [MerchantCategoryController::class, 'destroy']);
         Route::patch('/admin/merchant-categories/{id}/toggle', [MerchantCategoryController::class, 'toggleStatus']);
-        
+
         // --- Centralized Review Management (Admin) ---
         Route::get('admin/reviews', [\App\Http\Controllers\Operations\ReviewController::class, 'index']);
         Route::get('admin/reviews/stats', [\App\Http\Controllers\Operations\ReviewController::class, 'stats']);
