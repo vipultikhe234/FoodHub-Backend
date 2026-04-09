@@ -36,6 +36,17 @@ use App\Http\Controllers\Api\AIController;
 Route::get('/ping', function () {
     return response()->json(['status' => 'ok']);
 });
+
+Route::get('/cron/run', function () {
+    if (request('key') !== 'secret123') {
+        return response()->json(['error' => 'Unauthorized'], 403);
+    }
+
+    \Artisan::call('schedule:run');
+
+    return response()->json(['message' => 'Cron executed']);
+});
+
 // 0. Public Gateway (Non-Authenticated)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
