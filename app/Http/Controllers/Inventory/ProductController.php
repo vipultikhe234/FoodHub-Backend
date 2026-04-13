@@ -195,29 +195,27 @@ class ProductController extends Controller
     public function addReview(Request $request, $id)
     {
         $request->validate([
-            'order_id'   => 'required|integer|exists:orders,id',
+            'order_id'   => 'nullable|integer',
             'rating'     => 'required|integer|min:1|max:5',
-            'review'     => 'nullable|string|max:1000'
+            'review'     => 'nullable|string|max:1000',
+            'comment'    => 'nullable|string|max:1000'
         ]);
 
-        // Derive merchant from the product
         $product = Product::findOrFail($id);
         $merchantId = $product->merchant_id;
+        $orderId = $request->order_id;
+        $reviewText = $request->review ?? $request->comment;
 
-        // Verify the order belongs to this user and merchant, and is delivered
-        $order = \App\Models\Order::where('id', $request->order_id)
-            ->where('user_id', $request->user()->id)
-            ->where('merchant_id', $merchantId)
-            ->where('status', 'delivered')
-            ->firstOrFail();
-
-        // One review per order (enforced by DB unique constraint on user_id + order_id)
         $review = Review::updateOrCreate(
-            ['user_id' => $request->user()->id, 'order_id' => $order->id, 'product_id' => $id],
             [
+                'user_id' => $request->user()->id, 
+                'product_id' => $id,
                 'merchant_id' => $merchantId,
-                'rating'      => $request->rating,
-                'review'      => $request->review,
+                'order_id' => $orderId
+            ],
+            [
+                'rating' => $request->rating,
+                'review' => $reviewText,
             ]
         );
 
