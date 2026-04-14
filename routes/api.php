@@ -122,6 +122,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- Admin Control Plane ---
     Route::middleware('admin')->group(function () {
         Route::post('/admin/generate-offer-image', [AIController::class, 'generateOfferImage']);
+        Route::post('/admin/generate-image', [AIController::class, 'generateImage']);
         Route::get('/admin/merchants', [MerchantController::class, 'listAll']);
         Route::post('/admin/merchants', [MerchantController::class, 'store']);
         Route::put('/admin/merchants/{id}', [MerchantController::class, 'adminUpdate']);

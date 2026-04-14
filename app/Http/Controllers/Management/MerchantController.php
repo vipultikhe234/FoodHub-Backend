@@ -296,7 +296,7 @@ class MerchantController extends Controller
      */
     public function reviews($id)
     {
-        $reviews = \App\Models\Review::with('user')
+        $reviews = \App\Models\Review::with(['user', 'product'])
             ->where('merchant_id', $id)
             ->latest()
             ->paginate(15);
@@ -324,17 +324,26 @@ class MerchantController extends Controller
     public function addReview(Request $request, $id)
     {
         $request->validate([
-            'order_id' => 'nullable|integer|exists:orders,id',
-            'rating'   => 'required|integer|min:1|max:5',
-            'review'   => 'nullable|string|max:1000',
+            'order_id'   => 'nullable|integer|exists:orders,id',
+            'product_id' => 'nullable|integer|exists:products,id',
+            'rating'     => 'required|integer|min:1|max:5',
+            'review'     => 'nullable|string|max:1000',
         ]);
 
         $userId = $request->user()->id;
+        $productId = $request->product_id;
         
-        // Find existing review for this user and merchant
-        $existing = \App\Models\Review::where('user_id', $userId)
-            ->where('merchant_id', $id)
-            ->first();
+        // Find existing review for this user and merchant (optionally scoped by product)
+        $query = \App\Models\Review::where('user_id', $userId)
+            ->where('merchant_id', $id);
+            
+        if ($productId) {
+            $query->where('product_id', $productId);
+        } else {
+            $query->whereNull('product_id');
+        }
+
+        $existing = $query->first();
 
         if ($existing) {
             // Only update if the new rating is HIGHER than before
@@ -347,13 +356,13 @@ class MerchantController extends Controller
 
                 return response()->json([
                     'message' => 'Your review has been upgraded to a higher rating!',
-                    'data'    => new \App\Http\Resources\ReviewResource($existing->load('user')),
+                    'data'    => new \App\Http\Resources\ReviewResource($existing->load(['user', 'product'])),
                 ], 200);
             }
 
             return response()->json([
                 'message' => 'Your highest rating for this merchant is already recorded.',
-                'data'    => new \App\Http\Resources\ReviewResource($existing->load('user')),
+                'data'    => new \App\Http\Resources\ReviewResource($existing->load(['user', 'product'])),
             ], 200);
         }
 
@@ -361,6 +370,7 @@ class MerchantController extends Controller
         $review = \App\Models\Review::create([
             'user_id'     => $userId,
             'merchant_id' => $id,
+            'product_id'  => $productId,
             'order_id'    => $request->order_id,
             'rating'      => $request->rating,
             'review'      => $request->review,
@@ -368,7 +378,7 @@ class MerchantController extends Controller
 
         return response()->json([
             'message' => 'Review submitted successfully.',
-            'data'    => new \App\Http\Resources\ReviewResource($review->load('user')),
+            'data'    => new \App\Http\Resources\ReviewResource($review->load(['user', 'product'])),
         ], 201);
     }
 }

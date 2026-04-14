@@ -45,4 +45,9 @@ return [
         'server_key' => env('FIREBASE_SERVER_KEY'),
     ],
 
+    'ai' => [
+        'gemini' => env('GEMINI_API_KEY'),
+        'openai' => env('OPENAI_API_KEY'),
+    ],
+
 ];

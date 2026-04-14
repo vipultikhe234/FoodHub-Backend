@@ -221,7 +221,7 @@ class ProductController extends Controller
 
         return response()->json([
             'message' => 'Review submitted successfully',
-            'data'    => new ReviewResource($review->load('user'))
+            'data'    => new ReviewResource($review->load(['user', 'product']))
         ]);
     }
 

@@ -71,6 +71,18 @@ class Product extends Model
 
 
     /**
+     * Get the formatted image URL.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image) return null;
+        if (str_starts_with($this->image, 'data:') || str_starts_with($this->image, 'http')) {
+            return $this->image;
+        }
+        return asset('storage/' . $this->image);
+    }
+
+    /**
      * Scope a query to only include active products.
      */
     public function scopeActive($query)

@@ -21,6 +21,11 @@ class ReviewResource extends JsonResource
             'order_id'    => $this->order_id,
             'rating'      => (int) $this->rating,
             'review'      => $this->review,
+            'product'     => $this->product_id ? [
+                'id'      => $this->product_id,
+                'name'    => $this->product?->name ?? 'Deleted Product',
+                'image_url' => $this->product?->image_url,
+            ] : null,
             'created_at'  => $this->created_at?->format('d M Y'),
         ];
     }
