@@ -21,6 +21,7 @@ class Coupon extends Model
         'is_active',
         'expires_at',
         'show_on_landing',
+        'is_admin_coupon',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Coupon extends Model
         'max_discount' => 'decimal:2',
         'is_active' => 'boolean',
         'show_on_landing' => 'boolean',
+        'is_admin_coupon' => 'boolean',
         'expires_at' => 'datetime',
     ];
 

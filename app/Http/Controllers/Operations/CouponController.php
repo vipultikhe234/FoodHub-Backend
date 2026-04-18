@@ -100,11 +100,13 @@ class CouponController extends Controller
             'is_active' => 'boolean',
             'merchant_id' => 'nullable|exists:merchants,id',
             'show_on_landing' => 'nullable|boolean',
+            'is_admin_coupon' => 'nullable|boolean',
         ]);
 
         if ($request->user()->role === 'merchant') {
             $validated['merchant_id'] = $request->user()->merchant?->id;
             if (!$validated['merchant_id']) return response()->json(['message' => 'No Merchant context'], 400);
+            $validated['is_admin_coupon'] = false;
         }
 
         $coupon = Coupon::create($validated);
@@ -116,7 +118,7 @@ class CouponController extends Controller
                     'title' => ($coupon->type === 'percentage' ? "{$coupon->value}% OFF" : "₹{$coupon->value} FLAT") . " ON ORDERS",
                     'subtitle' => "Use code: {$coupon->code} | Min Order ₹{$coupon->min_order_amount}",
                     'image' => null, // Branding image fallback will be handled in frontend
-                    'link' => "/Merchant/{$coupon->merchant_id}",
+                    'link' => $coupon->is_admin_coupon ? "/" : "/Merchant/{$coupon->merchant_id}",
                     'merchant_id' => $coupon->merchant_id
                 ]
             );
@@ -146,6 +148,7 @@ class CouponController extends Controller
             'is_active' => 'boolean',
             'merchant_id' => 'nullable|exists:merchants,id',
             'show_on_landing' => 'nullable|boolean',
+            'is_admin_coupon' => 'nullable|boolean',
         ]);
 
         $coupon->update($validated);
@@ -157,7 +160,7 @@ class CouponController extends Controller
                     'title' => ($coupon->type === 'percentage' ? "{$coupon->value}% OFF" : "₹{$coupon->value} FLAT") . " ON ORDERS",
                     'subtitle' => "Use code: {$coupon->code} | Min Order ₹{$coupon->min_order_amount}",
                     'image' => null, 
-                    'link' => "/Merchant/{$coupon->merchant_id}",
+                    'link' => $coupon->is_admin_coupon ? "/" : "/Merchant/{$coupon->merchant_id}",
                     'merchant_id' => $coupon->merchant_id
                 ]
             );
