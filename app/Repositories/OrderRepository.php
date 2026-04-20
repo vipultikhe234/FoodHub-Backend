@@ -37,20 +37,21 @@ class OrderRepository
                 $product = \App\Models\Product::find($item['product_id']);
                 $variant = isset($item['product_variant_id']) ? \App\Models\ProductVariant::find($item['product_variant_id']) : null;
 
-                if (!$product) continue;
+                if (!$product)
+                    continue;
 
                 // 3. Create Immutable Order ItemSnapshot
                 $orderItem = new OrderItem([
-                    'order_id'           => $order->id,
-                    'product_id'         => $item['product_id'],
+                    'order_id' => $order->id,
+                    'product_id' => $item['product_id'],
                     'product_variant_id' => $item['product_variant_id'] ?? null,
-                    'product_name'       => $product->name,
-                    'variant_name'       => $variant ? $variant->name : null,
-                    'quantity'           => $item['quantity'],
-                    'unit_price'         => $item['price'],
-                    'total_price'        => $item['price'] * $item['quantity'],
-                    'created_at'         => now(),
-                    'updated_at'         => now(),
+                    'product_name' => $product->name,
+                    'variant_name' => $variant ? $variant->name : null,
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['price'],
+                    'total_price' => $item['price'] * $item['quantity'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
 
                 $orderItem->save();
@@ -61,7 +62,7 @@ class OrderRepository
                     $inventory = \App\Models\Inventory::where('product_variant_id', $variant->id)
                         ->where('merchant_id', $order->merchant_id)
                         ->first();
-                    
+
                     if ($inventory) {
                         $inventory->decrement('stock', $item['quantity']);
                     }

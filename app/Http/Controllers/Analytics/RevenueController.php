@@ -18,6 +18,8 @@ class RevenueController extends Controller
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
 
+        $settlementService = app(\App\Services\Analytics\SettlementService::class);
+
         // Logic branching: if Merchant, ignore merchant_id and use their own.
         if ($user->role === 'merchant') {
             $merchant = $user->merchant;
@@ -63,80 +65,14 @@ class RevenueController extends Controller
         $totalMerchantPayout = 0;
         $totalAdminProfit = 0;
 
-        $processedOrders = $orders->map(function ($order) use (&$totalMerchantPayout, &$totalAdminProfit) {
-            $isMerchantCoupon = $order->coupon && !$order->coupon->is_admin_coupon;
-            $isAdminCoupon = $order->coupon && $order->coupon->is_admin_coupon;
+        $processedOrders = $orders->map(function ($order) use (&$totalMerchantPayout, &$totalAdminProfit, $settlementService) {
+            $calculations = $settlementService->calculate($order);
 
-            $otherCharges = $order->merchant->other_charges;
+            $totalMerchantPayout += $calculations['merchant_payout'];
+            $totalAdminProfit += $calculations['admin_profit'];
 
-            // 1. Merchant Calculations (Inbound)
-            // Assuming fees in DB are inclusive of GST. We decouple them for display.
-            $p_rate = (float) ($otherCharges->packaging_charge_tax ?? 0);
-            $d_rate = (float) ($otherCharges->delivery_charge_tax ?? 0);
-
-            $packagingBase = (float) $order->packaging_fee / (1 + ($p_rate / 100));
-            $packagingGst = (float) $order->packaging_fee - $packagingBase;
-
-            $deliveryBase = (float) $order->delivery_fee / (1 + ($d_rate / 100));
-            $deliveryGst = (float) $order->delivery_fee - $deliveryBase;
-
-            $commissionRate = $otherCharges->commission_rate ?? 0;
-            $merchantCommission = ($order->subtotal * ($commissionRate / 100));
-
-            $baseSubtotal = (float) $order->subtotal;
-            $merchantAdjustment = 0;
-
-            if ($isMerchantCoupon) {
-                // Merchant funded: Deduct from their total
-                $merchantAdjustment = -((float) $order->coupon_discount);
-            } elseif ($isAdminCoupon) {
-                // Admin funded: Merchant sees discounted price + reimbursement
-                $baseSubtotal -= (float) $order->coupon_discount;
-                $merchantAdjustment = (float) $order->coupon_discount;
-            }
-
-            $merchantPayout = $baseSubtotal + (float) $order->tax_amount + (float) $order->packaging_fee + (float) $order->delivery_fee + $merchantAdjustment - $merchantCommission;
-
-            // 2. Platform Calculations (Inbound)
-            $pl_rate = (float) ($otherCharges->platform_fee_tax ?? 0);
-            $platformBase = (float) $order->platform_fee / (1 + ($pl_rate / 100));
-            $platformGst = (float) $order->platform_fee - $platformBase;
-
-            $adminProfit = (float) $order->platform_fee + $merchantCommission;
-            if ($isAdminCoupon) {
-                $adminProfit -= (float) $order->coupon_discount;
-            }
-
-            $totalMerchantPayout += $merchantPayout;
-            $totalAdminProfit += $adminProfit;
-
-            // Final calculation summary
             return array_merge($order->toArray(), [
-                'calculations' => [
-                    'merchant_payout' => round($merchantPayout, 2),
-                    'admin_profit' => round($adminProfit, 2),
-                    'merchant_commission' => round($merchantCommission, 2),
-                    'commission_rate' => $commissionRate . '%',
-                    'base_subtotal' => round((float)($order->subtotal ?? $order->sub_total), 2),
-                    'items_gst' => round((float)($order->items_tax ?? 0), 2),
-                    'packaging_fee' => round((float)($order->packaging_fee ?? 0), 2),
-                    'packaging_tax' => round((float)($order->packaging_tax ?? 0), 2),
-                    'delivery_fee' => round((float)($order->delivery_fee ?? 0), 2),
-                    'delivery_tax' => round((float)($order->delivery_tax ?? 0), 2),
-                    'platform_fee' => round((float)($order->platform_fee ?? 0), 2),
-                    'platform_tax' => round((float)($order->platform_tax ?? 0), 2),
-                    'items_gst_percent' => floatval($order->subtotal ?? 1) > 0 ? round((floatval($order->items_tax ?? 0) / floatval($order->subtotal ?? 1)) * 100, 1) : 0,
-                    'merchant_adjustment' => round($merchantAdjustment ?? 0, 2),
-                    'tax_breakdown' => [
-                        'items_gst' => round((float)($order->items_tax ?? $order->tax_amount), 2),
-                        'packaging_gst' => round((float)($order->packaging_tax ?? 0), 2),
-                        'delivery_gst' => round((float)($order->delivery_tax ?? 0), 2),
-                        'platform_gst' => round((float)($order->platform_tax ?? 0), 2),
-                    ],
-                    'coupon_type' => $order->coupon ? ($order->coupon->is_admin_coupon ? 'Platform' : 'Merchant') : 'None',
-                    'is_merchant_coupon' => $isMerchantCoupon,
-                    'is_admin_coupon' => $isAdminCoupon
-                ]
+                'calculations' => $calculations
             ]);
         });
 

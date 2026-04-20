@@ -14,7 +14,8 @@ class OrderService
         protected OrderRepository $repository,
         protected StripePaymentService $stripeService,
         protected FCMService $fcmService
-    ) {}
+    ) {
+    }
 
     public function placeOrder(array $data, array $items)
     {
@@ -38,7 +39,7 @@ class OrderService
         $orderType = $data['order_type'] ?? \App\Models\Order::TYPE_DELIVERY;
         $deliveryFee = 0.00;
         $distance = 0.00;
-        
+
         if ($orderType !== \App\Models\Order::TYPE_PICKUP && $charges) {
             if ($charges->delivery_charge_type === 'distance') {
                 $userLat = $data['latitude'] ?? null;
@@ -73,17 +74,18 @@ class OrderService
         // 2.1 Calculate Item Subtotal and Detailed Item Tax
         $subtotal = 0;
         $itemsTax = 0;
-        
+
         foreach ($items as $item) {
             $product = \App\Models\Product::find($item['product_id']);
-            if (!$product) continue;
-            
+            if (!$product)
+                continue;
+
             $itemPrice = $item['price'];
             $qty = $item['quantity'];
             $subtotal += ($itemPrice * $qty);
-            
+
             // Calculate Item tax (GST) specifically for these products
-            $taxRate = (float)($product->tax_rate ?? 5.0); // Default 5% if missing
+            $taxRate = (float) ($product->tax_rate ?? 5.0); // Default 5% if missing
             $itemsTax += round(($itemPrice * $qty * ($taxRate / 100)), 2);
         }
 
@@ -114,33 +116,34 @@ class OrderService
         // Formula: Subtotal + ItemTax + (Pkg + PkgTax) + (Deliv + DelivTax) + (Platform + PlatformTax) - Discount
         $totalFeesAndTaxes = $itemsTax + $packagingCharge + $packagingTax + $deliveryFee + $deliveryTax + $platformFee + $platformTax;
         $totalPrice = ($subtotal - $discount) + $totalFeesAndTaxes;
-        
-        if ($totalPrice < 0) $totalPrice = 0;
+
+        if ($totalPrice < 0)
+            $totalPrice = 0;
 
         // 5. Wrap order + payment creation in a transaction
         return DB::transaction(function () use ($data, $items, $totalPrice, $subtotal, $itemsTax, $packagingCharge, $packagingTax, $deliveryFee, $deliveryTax, $platformFee, $platformTax, $discount, $couponId, $MerchantId, $distance) {
             $orderData = [
-                'user_id'         => $data['user_id'],
-                'merchant_id'     => $MerchantId,
-                'total_price'     => round($totalPrice, 2),
-                'subtotal'        => round($subtotal, 2),
-                'items_tax'       => round($itemsTax, 2),
-                'packaging_fee'   => round($packagingCharge, 2),
-                'packaging_tax'   => round($packagingTax, 2),
-                'delivery_fee'    => round($deliveryFee, 2),
-                'delivery_tax'    => round($deliveryTax, 2),
-                'platform_fee'    => round($platformFee, 2),
-                'platform_tax'    => round($platformTax, 2),
-                'tax_amount'      => round($itemsTax + $packagingTax + $deliveryTax + $platformTax, 2), // Legacy Total Tax
-                'status'          => \App\Models\Order::STATUS_PLACED,
-                'payment_status'  => 'pending',
-                'address'         => $data['delivery_address'],
-                'user_lat'        => $data['latitude'] ?? null,
-                'user_lng'        => $data['longitude'] ?? null,
-                'distance_km'     => $distance ?? 0,
+                'user_id' => $data['user_id'],
+                'merchant_id' => $MerchantId,
+                'total_price' => round($totalPrice, 2),
+                'subtotal' => round($subtotal, 2),
+                'items_tax' => round($itemsTax, 2),
+                'packaging_fee' => round($packagingCharge, 2),
+                'packaging_tax' => round($packagingTax, 2),
+                'delivery_fee' => round($deliveryFee, 2),
+                'delivery_tax' => round($deliveryTax, 2),
+                'platform_fee' => round($platformFee, 2),
+                'platform_tax' => round($platformTax, 2),
+                'tax_amount' => round($itemsTax + $packagingTax + $deliveryTax + $platformTax, 2), // Legacy Total Tax
+                'status' => \App\Models\Order::STATUS_PLACED,
+                'payment_status' => 'pending',
+                'address' => $data['delivery_address'],
+                'user_lat' => $data['latitude'] ?? null,
+                'user_lng' => $data['longitude'] ?? null,
+                'distance_km' => $distance ?? 0,
                 'coupon_discount' => $discount,
-                'coupon_id'       => $couponId,
-                'order_type'      => $data['order_type'] ?? \App\Models\Order::TYPE_DELIVERY,
+                'coupon_id' => $couponId,
+                'order_type' => $data['order_type'] ?? \App\Models\Order::TYPE_DELIVERY,
                 'estimated_delivery_time' => now()->addMinutes(30),
             ];
 
@@ -149,8 +152,8 @@ class OrderService
 
             $order->payment()->create([
                 'payment_method' => $data['payment_method'],
-                'amount'         => $totalPrice,
-                'status'         => 'pending',
+                'amount' => $totalPrice,
+                'status' => 'pending',
             ]);
 
             // Notify user of order success
@@ -159,7 +162,7 @@ class OrderService
                     $order->user->fcm_token,
                     'Order Confirmed! 🎉',
                     'Your order ID #' . str_pad($order->id, 4, '0', STR_PAD_LEFT) . ' has been placed successfully.',
-                    ['type' => 'order', 'id' => (string)$order->id],
+                    ['type' => 'order', 'id' => (string) $order->id],
                     $order->user_id
                 );
             }
@@ -171,7 +174,7 @@ class OrderService
                     throw new \Exception('Stripe interaction failed: ' . $intent['message']);
                 }
                 return [
-                    'order'               => $order,
+                    'order' => $order,
                     'stripe_client_secret' => $intent['client_secret'],
                 ];
             }
@@ -183,7 +186,8 @@ class OrderService
     public function updateOrderStatus($id, $status)
     {
         $order = $this->repository->findById($id);
-        if (!$order) return null;
+        if (!$order)
+            return null;
 
         // Force reload the model and its relations to prevent stale data checks
         $order->refresh();
@@ -204,22 +208,22 @@ class OrderService
         $order = $this->repository->updateStatus($id, $status);
         if ($order) {
             $order->load(['user', 'merchant.merchantCategory']); // Load category context
-            
+
             // Notify user of status change (Safe & Context-Aware)
             try {
                 if ($order->user && $order->user->fcm_token) {
                     $category = strtolower($order->merchant->merchantCategory->name ?? 'general');
                     $isFood = str_contains($category, 'food') || str_contains($category, 'restaura');
-                    
-                    $statusMsg = match($status) {
-                        \App\Models\Order::STATUS_ACCEPTED  => 'Your order has been accepted! ✅',
+
+                    $statusMsg = match ($status) {
+                        \App\Models\Order::STATUS_ACCEPTED => 'Your order has been accepted! ✅',
                         \App\Models\Order::STATUS_PREPARING => $isFood ? 'The chef is preparing your meal... 🧑‍🍳' : 'Your items are being packed for delivery... 📦',
-                        \App\Models\Order::STATUS_READY     => $order->order_type === \App\Models\Order::TYPE_PICKUP ? 'Ready for Pickup! 🎁' : 'The parcel is ready for the rider! 📦',
+                        \App\Models\Order::STATUS_READY => $order->order_type === \App\Models\Order::TYPE_PICKUP ? 'Ready for Pickup! 🎁' : 'The parcel is ready for the rider! 📦',
                         \App\Models\Order::STATUS_OUT_FOR_DELIVERY => 'Your order is out for delivery! 🛵💨',
-                        \App\Models\Order::STATUS_DELIVERED  => 'Delivered! We hope you love your order! ✨',
-                        \App\Models\Order::STATUS_PICKED_UP   => 'Picked up successfully! Have a great day! 🛍️',
-                        \App\Models\Order::STATUS_CANCELLED  => 'The order has been cancelled.',
-                        default      => 'Your order status has been updated to: ' . ucfirst($status)
+                        \App\Models\Order::STATUS_DELIVERED => 'Delivered! We hope you love your order! ✨',
+                        \App\Models\Order::STATUS_PICKED_UP => 'Picked up successfully! Have a great day! 🛍️',
+                        \App\Models\Order::STATUS_CANCELLED => 'The order has been cancelled.',
+                        default => 'Your order status has been updated to: ' . ucfirst($status)
                     };
 
                     $this->fcmService->sendNotification(
@@ -227,8 +231,8 @@ class OrderService
                         'Order Status: ' . ucfirst($status),
                         $statusMsg,
                         [
-                            'type' => 'order_status', 
-                            'order_id' => (string)$order->id, 
+                            'type' => 'order_status',
+                            'order_id' => (string) $order->id,
                             'status' => $status
                         ],
                         $order->user_id
@@ -246,17 +250,18 @@ class OrderService
     public function updatePaymentStatus($id, $paymentStatus)
     {
         $order = $this->repository->findById($id);
-        if (!$order) return null;
+        if (!$order)
+            return null;
 
         return DB::transaction(function () use ($order, $paymentStatus) {
             $order->update(['payment_status' => $paymentStatus]);
-            
+
             if ($order->payment) {
                 // Map status to match the payments table enum: ['pending', 'completed', 'failed']
-                $mappedStatus = match($paymentStatus) {
-                    'paid'      => 'completed',
-                    'failed'    => 'failed',
-                    default     => 'pending',
+                $mappedStatus = match ($paymentStatus) {
+                    'paid' => 'completed',
+                    'failed' => 'failed',
+                    default => 'pending',
                 };
                 $order->payment->update(['status' => $mappedStatus]);
             }

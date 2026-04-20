@@ -12,8 +12,10 @@ class OrderController extends Controller
 {
     public function __construct(
         protected OrderService $service,
-        protected \App\Services\Operations\CheckoutService $checkoutService
-    ) {}
+        protected \App\Services\Operations\CheckoutService $checkoutService,
+        protected \App\Services\Analytics\SettlementService $settlementService
+    ) {
+    }
 
     /**
      * Store a newly created order in storage.
@@ -22,7 +24,7 @@ class OrderController extends Controller
     {
         try {
             $data = $request->all();
-            
+
             // ACP Path: Atomic Checkout Process
             $order = $this->checkoutService->process($data, $request->user());
 
@@ -31,7 +33,7 @@ class OrderController extends Controller
                 $intent = $this->service->initiatePayment($order->id);
                 return response()->json([
                     'message' => 'Order placed. Finalizing payment...',
-                    'data'    => [
+                    'data' => [
                         'order' => $order->load(['items.product', 'items.variant', 'payment']),
                         'stripe_client_secret' => $intent['client_secret']
                     ]
@@ -40,7 +42,7 @@ class OrderController extends Controller
 
             return response()->json([
                 'message' => 'Order placed successfully',
-                'data'    => [
+                'data' => [
                     'order' => $order->load(['items.product', 'items.variant', 'payment'])
                 ]
             ], 201);
@@ -56,7 +58,7 @@ class OrderController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $order = Order::with(['items.product', 'items.variant', 'user', 'payment', 'merchant'])->find($id);
+        $order = Order::with(['items.product', 'items.variant', 'user', 'payment', 'merchant.other_charges'])->find($id);
 
         if (!$order) {
             return response()->json(['message' => 'Order not found'], 404);
@@ -71,7 +73,11 @@ class OrderController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        return response()->json(['data' => $order]);
+        // Add Calculations
+        $orderArray = $order->toArray();
+        $orderArray['calculations'] = $this->settlementService->calculate($order);
+
+        return response()->json(['data' => $orderArray]);
     }
 
     /**
@@ -87,6 +93,12 @@ class OrderController extends Controller
         } else {
             $orders = $this->service->getUserOrders($request->user()->id);
         }
+
+        // Map calculations to each order
+        $orders->map(function ($order) {
+            $order->calculations = $this->settlementService->calculate($order);
+            return $order;
+        });
 
         return response()->json(['data' => $orders]);
     }
