@@ -31,7 +31,8 @@ class CouponController extends Controller
         if ($request->merchant_id) {
             $query->where(function($q) use ($request) {
                 $q->whereNull('merchant_id')
-                  ->orWhere('merchant_id', $request->merchant_id);
+                  ->orWhere('merchant_id', $request->merchant_id)
+                  ->orWhere('is_admin_coupon', true);
             });
         }
 

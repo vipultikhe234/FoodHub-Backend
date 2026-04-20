@@ -40,6 +40,34 @@ class Coupon extends Model
     }
 
     /**
+     * Override HasMerchantFilter's scopeByMerchant to ALSO include platform-wide (Admin) coupons.
+     * Admin coupons should be shown to every user regardless of the merchant.
+     */
+    public function scopeByMerchant($query, $merchantId = null)
+    {
+        // 1. If explicit merchantId provided (Customer in Cart)
+        if ($merchantId) {
+            return $query->where(function($q) use ($merchantId) {
+                $q->where('merchant_id', $merchantId)
+                  ->orWhere('is_admin_coupon', true);
+            });
+        }
+
+        // 2. If logged in as Merchant, auto-filter by their own profile
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user && $user->role === 'merchant') {
+            $myMerchant = $user->merchant;
+            if ($myMerchant) {
+                return $query->where('merchant_id', $myMerchant->id);
+            }
+            return $query->where('merchant_id', 0);
+        }
+
+        // 3. For Admin overview, show all
+        return $query;
+    }
+
+    /**
      * Scope to only include active and non-expired coupons.
      */
     public function scopeActive($query)

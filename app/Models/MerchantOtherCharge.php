@@ -17,6 +17,7 @@ class MerchantOtherCharge extends Model
         'delivery_charge_tax',
         'packaging_charge_tax',
         'platform_fee_tax',
+        'commission_rate',
     ];
 
     protected $casts = [
@@ -26,6 +27,7 @@ class MerchantOtherCharge extends Model
         'delivery_charge_tax' => 'decimal:2',
         'packaging_charge_tax' => 'decimal:2',
         'platform_fee_tax' => 'decimal:2',
+        'commission_rate' => 'decimal:2',
     ];
 
     public function merchant()

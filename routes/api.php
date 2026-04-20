@@ -20,6 +20,7 @@ use App\Http\Controllers\Operations\StripeWebhookController;
 use App\Http\Controllers\Logistics\RiderController;
 
 use App\Http\Controllers\Analytics\DashboardController;
+use App\Http\Controllers\Analytics\RevenueController;
 
 use App\Http\Controllers\Management\MerchantController;
 use App\Http\Controllers\Management\LocationController;
@@ -118,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- Performance Analytics ---
     Route::get('/stats', [DashboardController::class, 'stats']);
+    Route::get('/analytics/revenue', [RevenueController::class, 'revenueReport']);
 
     // --- Admin Control Plane ---
     Route::middleware('admin')->group(function () {

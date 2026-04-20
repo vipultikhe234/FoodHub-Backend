@@ -90,40 +90,47 @@ class CheckoutService
                 }
             }
 
-            // 4. Calculations
-            $deliveryFee = $data['delivery_fee'] ?? 0;
-            $packingCharge = $data['packing_charge'] ?? 0;
-            $platformFee = $data['platform_fee'] ?? 0;
-            $taxAmount = $data['tax_amount'] ?? ($subtotal * 0.05);
-            $totalAmount = ($subtotal + $deliveryFee + $packingCharge + $platformFee + $taxAmount) - ($data['coupon_discount'] ?? 0);
+            // Trust Mobile App Calculations as explicitly requested to avoid discrepancies
+            $deliveryFee = floatval($data['delivery_fee'] ?? 0);
+            $deliveryTax = floatval($data['delivery_tax'] ?? 0);
+            $packagingFee = floatval($data['packing_charge'] ?? 0);
+            $packagingTax = floatval($data['packaging_tax'] ?? 0);
+            $platformFee = floatval($data['platform_fee'] ?? 0);
+            $platformTax = floatval($data['platform_tax'] ?? 0);
+            $itemsTax = floatval($data['items_tax'] ?? 0);
+            $taxAmount = floatval($data['tax_amount'] ?? 0);
+            $couponDiscount = floatval($data['coupon_discount'] ?? 0);
+            $totalAmount = floatval($data['total_price'] ?? 0);
 
-            // Generate Order Number: 3 Letters (A-Z only) + 7 random digits
-            $letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            $prefix = substr(str_shuffle($letters), 0, 3);
+            // Coupon ID Resolution (Priority to ID, fallback to code)
+            $couponId = $data['coupon_id'] ?? null;
+            if (!$couponId && !empty($data['coupon_code'])) {
+                $couponId = \App\Models\Coupon::where('code', $data['coupon_code'])->value('id');
+            }
+
+            // Generate Order Number
+            $prefix = substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 3);
             $orderNumber = $prefix . rand(1000000, 9999999);
 
             // 5. Create Order Header
             $isStripe = ($data['payment_method'] ?? 'COD') === 'stripe';
-
-            // Resolve Coupon ID for tracking
-            $couponId = null;
-            if (!empty($data['coupon_code'])) {
-                $couponId = Coupon::where('code', $data['coupon_code'])->value('id');
-            }
 
             $order = Order::create([
                 'order_number' => $orderNumber,
                 'idempotency_key' => $data['idempotency_key'] ?? null,
                 'user_id' => $user->id,
                 'merchant_id' => $Merchant->id,
-                'subtotal' => $subtotal,
+                'subtotal' => round($subtotal, 2),
+                'items_tax' => $itemsTax,
                 'tax_amount' => $taxAmount,
                 'delivery_fee' => $deliveryFee,
-                'packaging_fee' => $packingCharge,
+                'delivery_tax' => $deliveryTax,
+                'packaging_fee' => $packagingFee,
+                'packaging_tax' => $packagingTax,
                 'platform_fee' => $platformFee,
+                'platform_tax' => $platformTax,
                 'coupon_id' => $couponId,
-                'coupon_discount' => $data['coupon_discount'] ?? 0,
-                'coupon_code' => $data['coupon_code'] ?? null,
+                'coupon_discount' => $couponDiscount,
                 'total_price' => $totalAmount,
                 'address_id' => $address?->id,
                 'payment_method' => $data['payment_method'] ?? 'COD',

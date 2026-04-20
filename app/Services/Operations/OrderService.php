@@ -66,28 +66,36 @@ class OrderService
         $packagingCharge = $charges->packaging_charge ?? 0.00;
         $platformFee = $charges->platform_fee ?? 0.00;
 
-        $deliveryTax = $deliveryFee * (($charges->delivery_charge_tax ?? 0.0) / 100);
-        $packagingTax = $packagingCharge * (($charges->packaging_charge_tax ?? 0.0) / 100);
-        $platformTax = $platformFee * (($charges->platform_fee_tax ?? 0.0) / 100);
+        $deliveryTax = round($deliveryFee * (($charges->delivery_charge_tax ?? 0.0) / 100), 2);
+        $packagingTax = round($packagingCharge * (($charges->packaging_charge_tax ?? 0.0) / 100), 2);
+        $platformTax = round($platformFee * (($charges->platform_fee_tax ?? 0.0) / 100), 2);
 
-        $subtotal = array_reduce($items, function ($carry, $item) {
-            return $carry + ($item['price'] * $item['quantity']);
-        }, 0);
-
-        // Food Tax (fallback 5% for food, assume products don't have individual tax in this requirement)
-        $foodTax = $subtotal * 0.05;
+        // 2.1 Calculate Item Subtotal and Detailed Item Tax
+        $subtotal = 0;
+        $itemsTax = 0;
+        
+        foreach ($items as $item) {
+            $product = \App\Models\Product::find($item['product_id']);
+            if (!$product) continue;
+            
+            $itemPrice = $item['price'];
+            $qty = $item['quantity'];
+            $subtotal += ($itemPrice * $qty);
+            
+            // Calculate Item tax (GST) specifically for these products
+            $taxRate = (float)($product->tax_rate ?? 5.0); // Default 5% if missing
+            $itemsTax += round(($itemPrice * $qty * ($taxRate / 100)), 2);
+        }
 
         $discount = 0;
         $couponId = null;
 
-        // 3. Handle Coupon if provided
-        if (!empty($data['coupon_code'])) {
-            $coupon = \App\Models\Coupon::where('code', $data['coupon_code'])
-                ->where('is_active', true)
-                ->where('expires_at', '>', now())
-                ->first();
+        // 3. Handle Coupon if provided (Pre-validated from frontend ideally, but check again)
+        if (!empty($data['coupon_id'])) {
+            $couponId = $data['coupon_id'];
+            $coupon = \App\Models\Coupon::find($couponId);
 
-            if (!$coupon) {
+            if (!$coupon || !$coupon->is_active) {
                 throw new \Exception('The applied coupon is invalid or has expired.');
             }
 
@@ -96,35 +104,43 @@ class OrderService
             }
 
             if ($coupon->type === 'percentage') {
-                $discount = ($subtotal * $coupon->value) / 100;
+                $discount = round(($subtotal * $coupon->value) / 100, 2);
             } else {
                 $discount = $coupon->value;
             }
-            $couponId = $coupon->id;
         }
 
-        $totalMerchantFees = $deliveryFee + $packagingCharge + $platformFee;
-        $totalMerchantTaxes = $deliveryTax + $packagingTax + $platformTax;
-
-        $totalPrice = ($subtotal - $discount) + $totalMerchantFees + $totalMerchantTaxes + $foodTax;
+        // 4. Grand Total Calculation
+        // Formula: Subtotal + ItemTax + (Pkg + PkgTax) + (Deliv + DelivTax) + (Platform + PlatformTax) - Discount
+        $totalFeesAndTaxes = $itemsTax + $packagingCharge + $packagingTax + $deliveryFee + $deliveryTax + $platformFee + $platformTax;
+        $totalPrice = ($subtotal - $discount) + $totalFeesAndTaxes;
+        
         if ($totalPrice < 0) $totalPrice = 0;
 
-        // 4. Wrap order + payment creation in a transaction
-        return DB::transaction(function () use ($data, $items, $totalPrice, $discount, $couponId, $MerchantId, $distance) {
+        // 5. Wrap order + payment creation in a transaction
+        return DB::transaction(function () use ($data, $items, $totalPrice, $subtotal, $itemsTax, $packagingCharge, $packagingTax, $deliveryFee, $deliveryTax, $platformFee, $platformTax, $discount, $couponId, $MerchantId, $distance) {
             $orderData = [
-                'user_id'        => $data['user_id'],
-                'merchant_id'  => $MerchantId,
-                'total_price'    => $totalPrice,
-                'status'         => \App\Models\Order::STATUS_PLACED,
-                'payment_status' => 'pending',
-                'address'        => $data['delivery_address'],
-                'user_lat'       => $data['latitude'] ?? null,
-                'user_lng'       => $data['longitude'] ?? null,
-                'distance_km'    => $distance ?? 0,
-                'discount'       => $discount, // Snapshot for potential legacy consumers
-                'coupon_discount'=> $discount, // DB Column Match
-                'coupon_id'      => $couponId,
-                'order_type'     => $data['order_type'] ?? \App\Models\Order::TYPE_DELIVERY,
+                'user_id'         => $data['user_id'],
+                'merchant_id'     => $MerchantId,
+                'total_price'     => round($totalPrice, 2),
+                'subtotal'        => round($subtotal, 2),
+                'items_tax'       => round($itemsTax, 2),
+                'packaging_fee'   => round($packagingCharge, 2),
+                'packaging_tax'   => round($packagingTax, 2),
+                'delivery_fee'    => round($deliveryFee, 2),
+                'delivery_tax'    => round($deliveryTax, 2),
+                'platform_fee'    => round($platformFee, 2),
+                'platform_tax'    => round($platformTax, 2),
+                'tax_amount'      => round($itemsTax + $packagingTax + $deliveryTax + $platformTax, 2), // Legacy Total Tax
+                'status'          => \App\Models\Order::STATUS_PLACED,
+                'payment_status'  => 'pending',
+                'address'         => $data['delivery_address'],
+                'user_lat'        => $data['latitude'] ?? null,
+                'user_lng'        => $data['longitude'] ?? null,
+                'distance_km'     => $distance ?? 0,
+                'coupon_discount' => $discount,
+                'coupon_id'       => $couponId,
+                'order_type'      => $data['order_type'] ?? \App\Models\Order::TYPE_DELIVERY,
                 'estimated_delivery_time' => now()->addMinutes(30),
             ];
 

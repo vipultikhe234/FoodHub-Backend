@@ -89,6 +89,7 @@ class MerchantController extends Controller
             'delivery_charge_type'  => 'nullable|in:fixed,distance',
             'delivery_charge_per_km'=> 'nullable|numeric',
             'max_delivery_distance' => 'nullable|numeric',
+            'commission_rate'       => 'nullable|numeric',
         ]);
 
         // Convert is_open to boolean
@@ -103,7 +104,8 @@ class MerchantController extends Controller
             $chargeData = $request->only([
                 'delivery_charge', 'packaging_charge', 'platform_fee',
                 'delivery_charge_tax', 'packaging_charge_tax', 'platform_fee_tax',
-                'delivery_charge_type', 'delivery_charge_per_km', 'max_delivery_distance'
+                'delivery_charge_type', 'delivery_charge_per_km', 'max_delivery_distance',
+                'commission_rate'
             ]);
 
             if (!empty($chargeData)) {
@@ -143,6 +145,7 @@ class MerchantController extends Controller
             'delivery_charge_tax'   => 'nullable|numeric',
             'packaging_charge_tax'  => 'nullable|numeric',
             'platform_fee_tax'      => 'nullable|numeric',
+            'commission_rate'       => 'nullable|numeric',
             'merchant_category_id' => 'nullable|exists:merchant_categories,id',
         ]);
 
@@ -174,10 +177,11 @@ class MerchantController extends Controller
             $merchant->other_charges()->create([
                 'delivery_charge'       => $validated['delivery_charge'] ?? 20.00,
                 'packaging_charge'      => $validated['packaging_charge'] ?? 10.00,
-                'platform_fee'          => $validated['platform_fee'] ?? 5.00,
+                'platform_fee'          => $validated['platform_fee'] ?? 10.00,
                 'delivery_charge_tax'   => $validated['delivery_charge_tax'] ?? 5.0,
-                'packaging_charge_tax'  => $validated['packaging_charge_tax'] ?? 18.0,
+                'packaging_charge_tax'  => $validated['packaging_charge_tax'] ?? 5.0,
                 'platform_fee_tax'      => $validated['platform_fee_tax'] ?? 18.0,
+                'commission_rate'       => $validated['commission_rate'] ?? 5.0,
             ]);
 
             return response()->json([
@@ -217,6 +221,7 @@ class MerchantController extends Controller
             'delivery_charge_type'  => 'nullable|in:fixed,distance',
             'delivery_charge_per_km'=> 'nullable|numeric',
             'max_delivery_distance' => 'nullable|numeric',
+            'commission_rate'       => 'nullable|numeric',
             'merchant_category_id'  => 'nullable|exists:merchant_categories,id',
         ]);
 
@@ -251,7 +256,8 @@ class MerchantController extends Controller
             $chargeData = $request->only([
                 'delivery_charge', 'packaging_charge', 'platform_fee',
                 'delivery_charge_tax', 'packaging_charge_tax', 'platform_fee_tax',
-                'delivery_charge_type', 'delivery_charge_per_km', 'max_delivery_distance'
+                'delivery_charge_type', 'delivery_charge_per_km', 'max_delivery_distance',
+                'commission_rate'
             ]);
 
             if (!empty($chargeData)) {

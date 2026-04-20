@@ -26,9 +26,14 @@ return [
         'http://127.0.0.1:5174',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
+        'https://foodhub-admin.onrender.com', // Potential production admin
+        'https://foodhub-mobile.onrender.com', // Potential production mobile web
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '/^https?:\/\/[a-z0-9-]+\.onrender\.com$/',
+        '/^https?:\/\/[a-z0-9-]+\.vercel\.app$/',
+    ],
 
     'allowed_headers' => ['*'],
 
